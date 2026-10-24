@@ -1,0 +1,9 @@
+{
+  "name": "personal-portfolio-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server/share-server.cjs",
+    "test": "node test/run-tests.mjs"
+  }
+}
