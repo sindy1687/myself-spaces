@@ -107,7 +107,7 @@ progress{width:100%}
 .reader-wrap{max-width:var(--reader-width,720px);margin:0 auto;font-size:var(--reader-fs,18px);line-height:var(--reader-lh,1.9);font-family:Georgia,"Noto Serif TC","Songti TC",serif}
 .reader-wrap h1{text-align:center;font-weight:600;letter-spacing:.05em;margin:.5em 0 1.2em}
 .reader-wrap p{margin:0 0 .6em;white-space:pre-wrap;text-align:justify;text-indent:2em;letter-spacing:.02em}
-.reader-bar{position:sticky;top:52px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:.3rem .6rem;display:flex;gap:.4rem;flex-wrap:nowrap;z-index:20;align-items:center;overflow-x:auto}
+.reader-bar{position:sticky;top:calc(var(--header-h,52px) + 6px);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:.3rem .6rem;display:flex;gap:.4rem;flex-wrap:nowrap;z-index:20;align-items:center;overflow-x:auto}
 .reader-bar select,.reader-bar button,.reader-bar input{width:auto;padding:.25em .6em;font-size:.88em;white-space:nowrap}
 .reader-bar a{white-space:nowrap}
 body.reader-dark{--bg:#151515;--surface:#1e1e1e;--text:#d8d4c8;--border:#333;--muted:#888}
@@ -345,7 +345,7 @@ h1 .series-tag{font-size:.45em}
 .feat-tab{cursor:pointer;font:inherit}
 .feat-tab small{opacity:.7;margin-left:.15em}
 /* 作品管理：複選 */
-.w-bar{position:sticky;top:4rem;z-index:5;background:var(--surface);border:1px solid var(--primary);border-radius:var(--radius);padding:.5rem .8rem;margin-bottom:.6rem;box-shadow:var(--shadow)}
+.w-bar{position:sticky;top:calc(var(--header-h,52px) + 8px);z-index:5;background:var(--surface);border:1px solid var(--primary);border-radius:var(--radius);padding:.5rem .8rem;margin-bottom:.6rem;box-shadow:var(--shadow)}
 tr[data-k]{cursor:pointer}
 tr.w-picked td{background:color-mix(in srgb,var(--primary) 10%,transparent)}
 

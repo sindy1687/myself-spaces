@@ -45,6 +45,14 @@ export function navigate() {
   app.innerHTML = '<div class="empty"><h2>找不到頁面</h2><a href="#/">回首頁</a></div>';
 }
 
+// 頁首高度隨主題／螢幕寬度不同，量出來給閱讀列等 sticky 元素對齊，避免被頁首蓋住
+{
+  const header = document.getElementById('site-header');
+  const syncHeaderH = () => document.documentElement.style.setProperty('--header-h', header.offsetHeight + 'px');
+  new ResizeObserver(syncHeaderH).observe(header);
+  syncHeaderH();
+}
+
 // 行動版選單
 document.getElementById('nav-toggle').onclick = () => {
   const nav = document.getElementById('main-nav');
