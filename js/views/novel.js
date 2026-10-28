@@ -293,9 +293,12 @@ export async function renderNovelDetail(id) {
   const n = await get('novel', id);
   if (!n) return document.getElementById('app').innerHTML = '<div class="empty">找不到這部小說</div>';
   const prog = await getProgress(id);
+  const bmSet = new Set((prog?.bookmarks || []).map(b => b.chapterId));
   const cats = await listCategories('novel');
   const { getSettings } = await import('../store.js');
   const defCover = (await getSettings()).defaultNovelCover || '';
+  const chs = n.chapters || [];
+  const TOC_LIMIT = 12;
   const app = document.getElementById('app');
   app.innerHTML = `
     <div class="card" style="display:flex;gap:1.5rem;flex-wrap:wrap">
@@ -316,10 +319,37 @@ export async function renderNovelDetail(id) {
         </div>
       </div>
     </div>
-    <h2 class="section-title">目錄</h2>
-    <div class="card">${(n.chapters || []).map((c, i) => `<div class="chapter-item"><span class="muted">${i + 1}</span><a href="#/read/${id}/${c.id}" style="flex:1;color:var(--text)">${esc(c.title)}</a><span class="muted">${c.content.length} 字</span></div>`).join('') || '（無章節）'}</div>`;
+    <h2 class="section-title">目錄${chs.length ? `（${chs.length} 章）` : ''}</h2>
+    ${chs.length > TOC_LIMIT ? '<input id="toc-q" placeholder="搜尋章節名稱…" style="margin-bottom:.5rem">' : ''}
+    <div class="card toc-grid" id="toc-list">${chs.map((c, i) => `<div class="chapter-item${c.id === prog?.chapterId ? ' read-here' : ''}" data-t="${esc(c.title)}"><span class="muted">${i + 1}</span><a href="#/read/${id}/${c.id}" style="flex:1;color:var(--text)">${esc(c.title)}</a>${bmSet.has(c.id) ? '<span class="bm-mark" title="已加書籤">🔖</span>' : ''}${c.id === prog?.chapterId ? '<span class="read-badge">讀到這裡</span>' : ''}<span class="muted">${c.content.length} 字</span></div>`).join('') || '（無章節）'}</div>
+    ${chs.length > TOC_LIMIT ? '<button id="toc-more" class="toc-more"></button>' : ''}
+    ${(prog?.bookmarks || []).length ? `<h2 class="section-title">書籤清單</h2>
+    <div class="card">${prog.bookmarks.map((b, bi) => `<div class="chapter-item"><span class="bm-mark">🔖</span><a href="#/read/${id}/${b.chapterId}${b.pIdx != null ? '?p=' + b.pIdx : ''}" style="flex:1;color:var(--text)">${esc(b.title)}${b.snippet ? ` <span class="muted">${esc(b.snippet)}…</span>` : ''}</a><span class="muted">${fmtDate(b.at)}</span><button class="bm-del" data-b="${bi}" title="刪除書籤">✕</button></div>`).join('')}</div>` : ''}`;
 
   countView('novel', id);
+  // 章節很多時：預設只顯示前幾章（讀到的那章永遠顯示），可搜尋或一鍵展開
+  const tocList = document.getElementById('toc-list');
+  if (chs.length > TOC_LIMIT) {
+    const items = [...tocList.children];
+    const moreBtn = document.getElementById('toc-more'), qEl = document.getElementById('toc-q');
+    let expanded = false;
+    const apply = () => {
+      const q = qEl.value.trim();
+      items.forEach((el, i) => {
+        el.style.display = (!q || el.dataset.t.includes(q)) && (q || expanded || i < TOC_LIMIT || el.classList.contains('read-here')) ? '' : 'none';
+      });
+      moreBtn.style.display = q ? 'none' : '';
+      moreBtn.textContent = expanded ? '收起 ▴' : `展開全部 ${chs.length} 章 ▾`;
+    };
+    moreBtn.onclick = () => { expanded = !expanded; apply(); };
+    qEl.oninput = apply;
+    apply();
+  }
+  app.querySelectorAll('.bm-del').forEach(btn => btn.onclick = async () => {
+    const p = await getProgress(id);
+    await saveProgress(id, { bookmarks: (p?.bookmarks || []).filter((_, i) => i !== +btn.dataset.b) });
+    renderNovelDetail(id);
+  });
   const delBtn = document.getElementById('del');
   if (delBtn) {
     delBtn.onclick = async () => {
@@ -336,7 +366,8 @@ export async function renderNovelDetail(id) {
 function chapterEditor(n, opts = {}) {
   let chs = (n.chapters || []).map(c => ({ ...c }));
   modal(`
-    <h3>編輯章節「${esc(n.title)}」</h3>
+    <h3>編輯章節「${esc(n.title)}」（${chs.length} 章）</h3>
+    ${chs.length > 10 ? '<input id="ce-q" placeholder="搜尋章節…" style="margin-bottom:.4rem">' : ''}
     <div id="ce-list" style="max-height:50vh;overflow:auto"></div>
     <div class="row" style="margin-top:.8rem">
       <button id="ce-add">＋ 新增章節</button>
@@ -349,8 +380,9 @@ function chapterEditor(n, opts = {}) {
       onOpen(bg, close) {
         const listEl = bg.querySelector('#ce-list');
         function draw() {
+          const q = bg.querySelector('#ce-q')?.value.trim() || '';
           listEl.innerHTML = chs.map((c, i) => `
-            <div class="chapter-item" data-i="${i}">
+            <div class="chapter-item" data-i="${i}" style="${q && !c.title.includes(q) ? 'display:none' : ''}">
               <span class="muted">${i + 1}.</span>
               <input value="${esc(c.title)}" data-f="t" style="flex:1">
               <span class="muted">${c.content.length} 字</span>
@@ -361,6 +393,7 @@ function chapterEditor(n, opts = {}) {
             </div>`).join('');
         }
         draw();
+        bg.querySelector('#ce-q')?.addEventListener('input', draw);
         listEl.addEventListener('input', e => { const i = +e.target.closest('[data-i]').dataset.i; chs[i].title = e.target.value; });
         listEl.addEventListener('click', e => {
           const b = e.target.closest('[data-a]'); if (!b) return;
@@ -605,6 +638,9 @@ export async function renderReader(novelId, chapterId) {
   let idx = chs.findIndex(c => c.id === chapterId);
   if (idx < 0) idx = 0;
   const ch = chs[idx];
+  const prev = await getProgress(novelId).catch(() => null);
+  const paras = ch.content.split(/\n{2,}/);
+  const bmPara = new Set((prev?.bookmarks || []).filter(b => b.chapterId === ch.id && b.pIdx != null).map(b => b.pIdx));
   const prefs = { fs: 18, lh: 1.9, width: 720, mode: 'light', ...readerPrefs() };
 
   const app = document.getElementById('app');
@@ -618,12 +654,12 @@ export async function renderReader(novelId, chapterId) {
       <select id="lh" aria-label="行距"><option value="1.6">行距 1.6</option><option value="1.9">行距 1.9</option><option value="2.2">行距 2.2</option></select>
       <select id="rw" aria-label="閱讀寬度"><option value="600">窄</option><option value="720">標準</option><option value="920">寬</option></select>
       <select id="rmode" aria-label="閱讀模式"><option value="light">亮色</option><option value="dark">深色</option><option value="green">護眼</option></select>
-      <button id="bm">🔖 書籤</button>
+      <button id="bm" title="點一下段落選取，再按這裡把書籤存到該段">🔖 書籤</button>
       <button id="fs-btn">🔍 全文搜尋</button>
     </div>
     <div class="reader-wrap">
       <h1 style="font-size:1.5em">${esc(ch.title)}</h1>
-      ${ch.content.split(/\n{2,}/).map(p => `<p>${esc(p)}</p>`).join('')}
+      ${paras.map((p, pi) => `<p data-p="${pi}"${bmPara.has(pi) ? ' class="bm-para"' : ''}>${esc(p)}</p>`).join('')}
       <div class="row" style="justify-content:space-between;margin:2rem 0">
         ${idx > 0 ? `<a href="#/read/${novelId}/${chs[idx - 1].id}"><button>← 上一章</button></a>` : '<span></span>'}
         ${idx < chs.length - 1 ? `<a href="#/read/${novelId}/${chs[idx + 1].id}"><button class="primary">下一章 →</button></a>` : '<span class="muted">已是末章</span>'}
@@ -650,23 +686,55 @@ export async function renderReader(novelId, chapterId) {
   document.getElementById('rmode').onchange = e => { prefs.mode = e.target.value; applyPrefs(); };
 
   // 目錄抽屜
-  document.getElementById('toc-btn').onclick = () => {
+  document.getElementById('toc-btn').onclick = async () => {
+    const p = await getProgress(novelId).catch(() => null);
+    const bms = p?.bookmarks || [];
+    const bmSet = new Set(bms.map(b => b.chapterId));
     const ov = document.createElement('div'); ov.className = 'overlay';
     const dr = document.createElement('nav'); dr.className = 'toc-drawer'; dr.setAttribute('aria-label', '章節目錄');
-    dr.innerHTML = `<h3>${esc(n.title)}</h3>` + chs.map((c, i) => `<a class="${i === idx ? 'current' : ''}" href="#/read/${novelId}/${c.id}">${esc(c.title)}</a>`).join('');
+    dr.innerHTML = `<h3>${esc(n.title)}</h3>${chs.length > 10 ? '<input id="toc-f" placeholder="搜尋章節…" style="margin-bottom:.4rem">' : ''}`
+      + (bms.length ? `<div class="toc-bms"><h4 style="margin:.3rem 0 .1rem">書籤清單</h4>${bms.map(b => `<a href="#/read/${novelId}/${b.chapterId}${b.pIdx != null ? '?p=' + b.pIdx : ''}"><span class="bm-mark">🔖</span>${esc(b.title)}${b.snippet ? `<br><small class="muted">${esc(b.snippet)}…</small>` : ''}</a>`).join('')}</div>` : '')
+      + chs.map((c, i) => `<a class="ch ${i === idx ? 'current' : ''}" data-t="${esc(c.title)}" href="#/read/${novelId}/${c.id}">${bmSet.has(c.id) ? '<span class="bm-mark" title="已加書籤">🔖</span>' : ''}${esc(c.title)}${c.id === p?.chapterId ? ' <span class="read-badge">讀到這裡</span>' : ''}</a>`).join('');
     ov.onclick = () => { ov.remove(); dr.remove(); };
     document.body.append(ov, dr);
+    dr.querySelector('#toc-f')?.addEventListener('input', e => {
+      const q = e.target.value.trim();
+      dr.querySelectorAll('a.ch').forEach(a => a.style.display = !q || a.dataset.t.includes(q) ? '' : 'none');
+    });
     dr.querySelectorAll('a').forEach(a => a.onclick = () => { ov.remove(); dr.remove(); });
+    dr.querySelector('a.current')?.scrollIntoView({ block: 'center' });
   };
 
-  // 書籤
-  document.getElementById('bm').onclick = async () => {
-    const p = await getProgress(novelId);
-    const bms = p?.bookmarks || [];
-    bms.push({ chapterId: ch.id, title: ch.title, at: new Date().toISOString() });
-    await saveProgress(novelId, { chapterId: ch.id, scroll: scrollY, bookmarks: bms });
-    toast('已加入書籤', 'success');
+  // 書籤：點段落選取（虛線框），按 🔖 存到該段；沒選段落就存整章。同一位置再按一次取消
+  let selP = null;
+  const syncBmParas = bms => wrap.querySelectorAll('p[data-p]').forEach(el =>
+    el.classList.toggle('bm-para', bms.some(b => b.chapterId === ch.id && b.pIdx === +el.dataset.p)));
+  wrap.querySelectorAll('p[data-p]').forEach(el => el.onclick = () => {
+    const was = el.classList.contains('sel-p');
+    wrap.querySelectorAll('.sel-p').forEach(x => x.classList.remove('sel-p'));
+    selP = was ? null : +el.dataset.p;
+    if (!was) el.classList.add('sel-p');
+    refreshBmBtn();
+  });
+  const bmBtn = document.getElementById('bm');
+  const refreshBmBtn = async () => {
+    const p = await getProgress(novelId).catch(() => null);
+    const has = (p?.bookmarks || []).some(b => b.chapterId === ch.id && (b.pIdx ?? null) === selP);
+    bmBtn.textContent = has ? '🔖 已書籤' : selP != null ? `🔖 書籤第${selP + 1}段` : '🔖 書籤本章';
+    bmBtn.classList.toggle('primary', has);
   };
+  bmBtn.onclick = async () => {
+    const p = await getProgress(novelId);
+    const cur = p?.bookmarks || [];
+    const same = b => b.chapterId === ch.id && (b.pIdx ?? null) === selP;
+    const had = cur.some(same);
+    const bms = cur.filter(b => !same(b));
+    if (!had) bms.push({ chapterId: ch.id, pIdx: selP, title: selP != null ? `${ch.title}・第${selP + 1}段` : ch.title, snippet: selP != null ? paras[selP].slice(0, 30) : '', at: new Date().toISOString() });
+    await saveProgress(novelId, { bookmarks: bms });
+    toast(had ? '已移除書籤' : '已加入書籤', 'success');
+    syncBmParas(bms); refreshBmBtn();
+  };
+  refreshBmBtn();
 
   // 全文搜尋
   document.getElementById('fs-btn').onclick = () => {
@@ -693,10 +761,12 @@ export async function renderReader(novelId, chapterId) {
     });
   };
 
-  // 還原捲動位置：同一章回到上次位置，換章一律從頂端開始
-  const prev = await getProgress(novelId).catch(() => null);
-  const resume = prev?.chapterId === ch.id && prev.scroll ? prev.scroll : 0;
-  scrollTo(0, resume);
+  // 還原捲動位置：?p=N 跳到指定段落；否則同一章回到上次位置，換章從頂端開始
+  const pParam = new URLSearchParams(location.hash.split('?')[1] || '').get('p');
+  const pEl = pParam != null ? wrap.querySelector(`[data-p="${+pParam}"]`) : null;
+  const resume = pEl ? 0 : (prev?.chapterId === ch.id && prev.scroll ? prev.scroll : 0);
+  if (pEl) { pEl.scrollIntoView({ block: 'center' }); pEl.classList.add('bm-flash'); setTimeout(() => pEl.classList.remove('bm-flash'), 1600); }
+  else scrollTo(0, resume);
 
   // 儲存閱讀進度（離開本章後不再寫入，避免延遲的存檔蓋掉新章節）
   let active = true;

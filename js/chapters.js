@@ -1,24 +1,33 @@
 // 章節辨識與文字編碼處理（純函式，可測試）
 
 // 章節標記：出現在行首即算新章（標題後可接篇名，甚至內文）
+// 容忍貼上來的 Markdown 前綴（#/##/###…、**粗體**）與《書名》裝飾
 const NUM = '0-9０-９零一二三四五六七八九十百千兩萬壹貳參肆伍陸柒捌玖拾';
 const MARKER = new RegExp(
-  '^(?:[【（(\\[「]*\\s*)?' +
+  '^(?:#{1,6}[ \\t\\u3000]*)?(?:[*_]{1,2})?' +
+  '(?:[【（(\\[「]*\\s*)?' +
+  '(?:《[^》\\n]{1,60}》\\s*)?' +
   '(?:' +
   `第[${NUM}]+[章回節卷集部篇話]` +
   '|序章|序曲|楔子|前言|引子|後記|尾聲|終章|番外篇?|外傳' +
   `|卷[${NUM}]+` +
   '|Chapter\\s+[0-9０-９]+|CHAPTER\\s+[0-9０-９]+|Prologue|Epilogue' +
-  ')[】）)\\]」]?'
+  ')[】）)\\]」]?(?:[*_]{1,2})?'
 );
 
 // 標題結束：空格/全形空格/冒號/破折號之後的短篇名（≤40 字，遇句號類標點截斷）
 function parseHeaderLine(line) {
   const m = line.match(MARKER);
   if (!m) return null;
-  const isNumbered = /^(?:第|Chapter|CHAPTER|卷)/i.test(m[0].replace(/^[【（(\[「\s]+/, ''));
-  let title = m[0].replace(/^[【（(\[「\s]+|[】）)\]」]+$/g, '').trim();
-  let rest = line.slice(m[0].length);
+  const isNumbered = /^(?:第|Chapter|CHAPTER|卷)/i.test(
+    m[0].replace(/^#{1,6}\s*/, '').replace(/^(?:[*_]{1,2})?[【（(\[「\s]*(?:《[^》\n]{1,60}》\s*)?/, ''));
+  let title = m[0]
+    .replace(/^#{1,6}\s*/, '')
+    .replace(/^[*_]{1,2}/, '')
+    .replace(/^(?:[【（(\[「\s]+|《[^》\n]{1,60}》\s*)+/, '')
+    .replace(/(?:[】）)\]」]+|[*_]{1,2})+$/, '')
+    .trim();
+  let rest = line.slice(m[0].length).replace(/[*_]{1,2}\s*$/, '');
   // 關鍵字型標記（楔子/序/後記…）：後面接長內文或句號時，不算章節
   if (!isNumbered && /[。！？!?]/.test(rest)) return null;
   if (!isNumbered && rest.replace(/^[\s\u3000:：\-—─．.]+/, '').length > 40) return null;
@@ -41,6 +50,8 @@ export function splitChapters(text) {
   for (const line of lines) {
     const t = line.trim();
     if (!t) { if (cur) cur.content += '\n'; continue; }
+    // 卷首的純《書名》行是書名裝飾，不算章節也不進內文
+    if (/^#{0,6}\s*《[^》\n]{1,60}》\s*$/.test(t) && (!cur || cur.title === '(卷首)')) continue;
     const h = parseHeaderLine(t);
     if (h) {
       push();

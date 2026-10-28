@@ -6,12 +6,19 @@ import { shareDialog } from './novel.js';
 
 const TABS = [['works', '作品管理'], ['categories', '分類管理'], ['appearance', '外觀範本'], ['drive', 'Google Drive'], ['backup', '備份'], ['trash', '回收筒']];
 const THEMES = [
-  ['literary', '文藝書房', '暖白米色・襯線字體・適合小說'],
-  ['floral', '花間手札', '植物綠・米白・壓花感・推薦主風格'],
-  ['bear', '小熊奶油手帳', '奶油白・奶茶棕・柔和粉・可愛圖示'],
-  ['gallery', '極簡畫廊', '留白大圖・俐落排版・適合圖片'],
-  ['journal', '日常手帳', '柔和配色・卡片設計・適合日記'],
-  ['night', '深夜創作', '深色背景・舒適對比・綜合作品'],
+  ['literary', '文藝書房', '暖白米色・襯線字體・適合小說', '#faf5ec', '#3a3128'],
+  ['floral', '花間手札', '植物綠・米白・壓花感・推薦主風格', '#f4f1e3', '#4a5140'],
+  ['bear', '小熊奶油手帳', '奶油白・奶茶棕・柔和粉・可愛圖示', '#fff8ee', '#4a3a2c'],
+  ['gallery', '極簡畫廊', '留白大圖・俐落排版・適合圖片', '#ffffff', '#111111'],
+  ['journal', '日常手帳', '柔和配色・卡片設計・適合日記', '#fdf3f0', '#4a3b40'],
+  ['night', '深夜創作', '深色背景・舒適對比・綜合作品', '#14161c', '#e6e4df'],
+  ['ink', '墨韻書齋', '宣紙白・墨黑・極簡禪意', '#f7f5f0', '#1f1f23'],
+  ['ocean', '海風信箋', '海沫白・深藍・清爽沉穩', '#eef4f6', '#1d2f3a'],
+  ['sakura', '櫻色季節', '櫻花粉・米白・柔和卡片', '#fdf1f4', '#4a2e35'],
+  ['matcha', '抹茶茶屋', '抹茶綠・米白・溫潤沉靜', '#f2f4ea', '#39402e'],
+  ['sunset', '落日晚霞', '暖橘・杏白・熱情溫暖', '#fdf2e7', '#42291d'],
+  ['mono', '黑白照相館', '純黑白・直角邊・俐落克制', '#ffffff', '#111111'],
+  ['lavender', '薰衣草田', '淡紫・米白・夢幻溫柔', '#f4f1f8', '#3d3350'],
 ];
 
 export async function renderAdmin(tab) {
@@ -286,9 +293,9 @@ function batchDialog(cats, redraw) {
 async function appearance(body) {
   const s = await getSettings();
   body.innerHTML = `
-    <div class="grid">${THEMES.map(([k, n, d]) => `
+    <div class="grid">${THEMES.map(([k, n, d, pbg, pfg]) => `
       <div class="card" style="text-align:center">
-        <div data-theme-preview="${k}" style="height:90px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;background:${{ literary: '#faf5ec', bear: '#fff8ee', floral: '#f4f1e3', gallery: '#fff', journal: '#fdf3f0', night: '#14161c' }[k]};color:${{ literary: '#3a3128', bear: '#4a3a2c', floral: '#4a5140', gallery: '#111', journal: '#4a3b40', night: '#e6e4df' }[k]}">Aa 🐻 預覽</div>
+        <div data-theme-preview="${k}" style="height:90px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;background:${pbg};color:${pfg}">Aa 預覽</div>
         <h3>${n}</h3><p class="muted">${d}</p>
         <button data-theme="${k}" class="${s.theme === k ? 'primary' : ''}">${s.theme === k ? '使用中' : '套用'}</button>
         <button data-try="${k}">即時預覽</button>

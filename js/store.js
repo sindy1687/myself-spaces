@@ -178,7 +178,10 @@ export const listTrash = () => db.all('trash');
 
 // ---- 閱讀進度 / 書籤 ----
 export async function saveProgress(novelId, data) {
-  await db.put('progress', { id: novelId, ...data, updatedAt: nowISO() });
+  // 合併寫入：略過 undefined 欄位，避免捲動存檔把書籤清掉
+  const cur = await db.get('progress', novelId);
+  const patch = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));
+  await db.put('progress', { ...(cur || {}), id: novelId, ...patch, updatedAt: nowISO() });
 }
 export const getProgress = novelId => db.get('progress', novelId);
 
@@ -234,11 +237,20 @@ export async function importAll(data, { merge = true } = {}) {
     if (origData && meta.origFileId) await db.put('files', { id: meta.origFileId, blob: dataURLToBlob(origData) });
     for (const v of versions || []) if (v.data) await db.put('files', { id: v.fileId, blob: dataURLToBlob(v.data) });
   }
-  if (data.settings) await saveSettings(data.settings);
+  if (data.settings) {
+    // 已移除示範資料者，不讓匯入把 demoLoaded 改回 false 而重新產生示範檔
+    const demoDone = (await getSettings()).demoLoaded;
+    await saveSettings(data.settings);
+    if (demoDone) await saveSettings({ demoLoaded: true });
+  }
 }
 
 // ---- 示範資料（明確標示，可一鍵移除）----
 export async function loadDemoData() {
+  // 已有示範項目（例如從備份匯入）就只補標記，避免每次刷新重複產生
+  for (const store of Object.values(TYPES)) {
+    if ((await db.all(store)).some(it => it.demo)) { await saveSettings({ demoLoaded: true }); return null; }
+  }
   const cat = await saveCategory({ name: '示範分類', type: 'shared' });
   const novel = await save('novel', {
     title: '【示範】巷口的老書店', author: '示範作者', desc: '這是示範小說，可隨時刪除。',
@@ -263,5 +275,5 @@ export async function removeDemoData() {
     for (const it of await db.all(store)) if (it.demo) await db.del(store, it.id);
   }
   for (const c of await db.all('categories')) if (c.name === '示範分類') await db.del('categories', c.id);
-  await saveSettings({ demoLoaded: false });
+  await saveSettings({ demoLoaded: true }); // 移除後不再自動載入
 }

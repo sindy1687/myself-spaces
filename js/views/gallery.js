@@ -1,5 +1,5 @@
 // 圖片：上傳、相簿、編輯、燈箱
-import { list, get, save, trash, listCategories } from '../store.js';
+import { list, get, save, trash, listCategories, getSettings } from '../store.js';
 import { db } from '../db.js';
 import { applyEdits, validateImage, IMAGE_LIMIT } from '../imgedit.js';
 import { esc, uid, modal, toast, confirmDialog, fmtDate, hydrateMedia } from '../util.js';
@@ -20,6 +20,17 @@ export async function renderGallery() {
   sessionStorage.setItem('lastType', 'image');
   if (catId) sessionStorage.setItem('cat:image', catId);
 
+  // 畫布拼貼當作畫廊門面的「拼貼牆」：整塊依原排版縮放顯示，點了進畫布
+  const { canvasItems = [] } = await getSettings();
+  let wallHTML = '';
+  if (canvasItems.length) {
+    const x0 = Math.min(...canvasItems.map(i => i.x)), y0 = Math.min(...canvasItems.map(i => i.y));
+    const x1 = Math.max(...canvasItems.map(i => i.x + i.w)), y1 = Math.max(...canvasItems.map(i => i.y + i.h));
+    const W = x1 - x0 || 1, H = y1 - y0 || 1;
+    wallHTML = `<h2 class="section-title">拼貼牆 <a class="muted" style="font-size:.7em;font-weight:400" href="#/canvas">編輯 →</a></h2>
+      <a class="collage-wall" href="#/canvas" style="aspect-ratio:${W}/${H};width:min(100%,${(W / H * 55).toFixed(1)}vh)">${canvasItems.map(it => `<img data-fid="${it.fileId}" alt="" style="left:${(it.x - x0) / W * 100}%;top:${(it.y - y0) / H * 100}%;width:${it.w / W * 100}%;height:${it.h / H * 100}%;transform:rotate(${it.rot || 0}deg);z-index:${it.z || 1}">`).join('')}</a>`;
+  }
+
   const app = document.getElementById('app');
   app.innerHTML = `
     <div class="row"><h1 style="margin-right:auto">圖片畫廊</h1>${isAuthed() ? '<button id="new-album">＋ 相簿</button>' : ''}</div>
@@ -28,12 +39,14 @@ export async function renderGallery() {
       <div id="up-prog"></div>
     </div>` : ''}
     ${catChips(iCats, 'image', '#/gallery', catId)}
+    ${wallHTML}
     ${albumId ? `<p class="muted">正在上傳到相簿「${esc(albums.find(a => a.id === albumId)?.name || '')}」 ・ <a href="#/album/${albumId}">← 回到相簿</a></p>`
       : albums.length ? `<h2 class="section-title">相簿</h2><div class="album-shelf">${albums.sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map(a => {
         const its = images.filter(i => i.albumId === a.id);
         const cv = its.find(i => i.id === a.coverId) || its[0];
+        const cov = [cv, ...its.filter(i => i !== cv)].filter(Boolean).slice(0, 4);
         return `<a class="album-book" href="#/album/${a.id}">
-          <div class="album-book-cover">${cv ? `<img data-fid="${esc(cv.fileId)}" alt="">` : '<span>📖</span>'}</div>
+          <div class="album-book-cover">${cov.length ? `<div class="alb-collage n${cov.length}">${cov.map(i => `<img data-fid="${esc(i.fileId)}" alt="">`).join('')}</div>` : '<span>📖</span>'}</div>
           <b>${esc(a.name)}</b><small class="muted">${its.length} 張</small></a>`;
       }).join('')}</div><h2 class="section-title">其他圖片</h2>` : ''}
     <div id="grid" class="gal-grid" style="margin-top:1rem"></div>`;

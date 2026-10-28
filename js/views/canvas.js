@@ -21,7 +21,7 @@ export async function renderCanvas() {
     app.innerHTML = `
       <div class="row"><h1 style="margin-right:auto">畫布拼貼</h1>
         ${isAuthed() ? `<button id="cv-mode" class="${editable ? 'primary' : ''}">${editable ? '✎ 編輯中' : '👁 預覽'}</button>
-        ${editable ? '<button id="cv-add">＋加入圖片</button><button id="cv-clear" class="danger">清空</button>' : ''}` : ''}</div>
+        ${editable ? '<button id="cv-add">＋加入圖片</button><button id="cv-arr">一鍵整理</button><button id="cv-clear" class="danger">清空</button>' : ''}` : ''}</div>
       ${editable ? '<p class="muted">Ctrl+V 貼上 / 拖曳圖片進畫布 ・ 點圖片顯示工具 ・ 拖角縮放、上方圓點旋轉、雙擊裁切 ・ Ctrl+Z 復原</p>' : ''}
       <div id="cv" style="position:relative;min-height:70vh;border:${editable ? '2px dashed var(--border)' : 'none'};border-radius:12px;overflow:hidden;background:var(--surface)">
         ${!items.length ? '<div class="empty">還沒有圖片，貼上或拖曳圖片開始拼貼</div>' : ''}
@@ -51,6 +51,7 @@ export async function renderCanvas() {
     hydrateMedia(cv);
     document.getElementById('cv-mode')?.addEventListener('click', () => { mode = mode === 'edit' ? 'view' : 'edit'; sel = null; draw(); });
     document.getElementById('cv-add')?.addEventListener('click', pickFile);
+    document.getElementById('cv-arr')?.addEventListener('click', arrangeDialog);
     document.getElementById('cv-clear')?.addEventListener('click', async () => { if (confirm('確定清空畫布？（Ctrl+Z 可復原）')) { push(); items = []; sel = null; save(); draw(); } });
   };
 
@@ -79,17 +80,18 @@ export async function renderCanvas() {
   const find = id => items.find(i => i.id === id);
   function bind(el, it) {
     const cv = document.getElementById('cv');
-    el.onmousedown = e => {
+    // Pointer events：滑鼠與觸控（平板/手機）通用；touch-action:none 由 CSS 提供
+    el.onpointerdown = e => {
       if (e.target.closest('.cv-tools') || e.target.classList.contains('cv-h') || e.target.classList.contains('cv-rot')) return;
       if (it.locked) { sel = it.id; draw(); return; }
       sel = it.id;
       const sx = e.clientX - it.x, sy = e.clientY - it.y;
       push();
       const mv = ev => { it.x = ev.clientX - sx; it.y = ev.clientY - sy; el.style.left = it.x + 'px'; el.style.top = it.y + 'px'; };
-      const up = () => { removeEventListener('mousemove', mv); removeEventListener('mouseup', up); save(); draw(); };
-      addEventListener('mousemove', mv); addEventListener('mouseup', up);
+      const up = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); save(); draw(); };
+      addEventListener('pointermove', mv); addEventListener('pointerup', up); addEventListener('pointercancel', up);
     };
-    el.querySelectorAll('.cv-h').forEach(h => h.onmousedown = e => {
+    el.querySelectorAll('.cv-h').forEach(h => h.onpointerdown = e => {
       e.preventDefault(); e.stopPropagation(); push();
       const sx = e.clientX, sy = e.clientY, sw = it.w, sh = it.h, sxp = it.x, syp = it.y, ratio = sw / sh;
       const dir = h.dataset.h;
@@ -103,16 +105,16 @@ export async function renderCanvas() {
         it.w = Math.max(30, w); it.x = xp; it.y = yp;
         el.style.cssText = `position:absolute;left:${it.x}px;top:${it.y}px;width:${it.w}px;height:${it.h}px;transform:rotate(${it.rot}deg);z-index:${it.z}`;
       };
-      const up = () => { removeEventListener('mousemove', mv); removeEventListener('mouseup', up); save(); };
-      addEventListener('mousemove', mv); addEventListener('mouseup', up);
+      const up = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); save(); };
+      addEventListener('pointermove', mv); addEventListener('pointerup', up); addEventListener('pointercancel', up);
     });
-    el.querySelector('.cv-rot')?.addEventListener('mousedown', e => {
+    el.querySelector('.cv-rot')?.addEventListener('pointerdown', e => {
       e.preventDefault(); e.stopPropagation(); push();
       const rect = el.getBoundingClientRect();
       const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
       const mv = ev => { it.rot = Math.round(Math.atan2(ev.clientY - cy, ev.clientX - cx) * 180 / Math.PI + 90); el.style.transform = `rotate(${it.rot}deg)`; };
-      const up = () => { removeEventListener('mousemove', mv); removeEventListener('mouseup', up); save(); };
-      addEventListener('mousemove', mv); addEventListener('mouseup', up);
+      const up = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); save(); };
+      addEventListener('pointermove', mv); addEventListener('pointerup', up); addEventListener('pointercancel', up);
     });
     el.ondblclick = () => cropDialog(it);
     el.querySelectorAll('.cv-tools [data-t]').forEach(b => b.onclick = e => {
@@ -128,6 +130,49 @@ export async function renderCanvas() {
     });
   }
 
+  // 一鍵整理：等寬瀑布排列，或全部裁成正方形統一大小
+  function arrangeDialog() {
+    if (!items.length) return toast('畫布是空的', 'error');
+    modal(`<h3>一鍵整理畫布</h3>
+      <label><input type="radio" name="am" value="fit" checked style="width:auto"> 等寬排列（自動縮放、保留原圖比例）</label>
+      <label><input type="radio" name="am" value="square" style="width:auto"> 裁切成正方形（統一大小，會另存裁切圖）</label>
+      <label>欄寬</label><select id="am-w"><option value="160">小 160px</option><option value="220" selected>中 220px</option><option value="320">大 320px</option></select>
+      <div class="row" style="justify-content:flex-end;margin-top:1rem"><button data-close>取消</button><button id="am-ok" class="primary">開始整理</button></div>`, {
+      onOpen(bg, close) {
+        bg.querySelector('#am-ok').onclick = async () => {
+          const mode2 = bg.querySelector('[name=am]:checked').value;
+          const cw = +bg.querySelector('#am-w').value, gap = 12;
+          push();
+          const sorted = [...items].sort((a, b) => (a.y - b.y) || (a.x - b.x));
+          for (const it of sorted) {
+            it.rot = 0;
+            if (mode2 === 'square') {
+              const side = Math.min(it.w, it.h);
+              const f = await db.get('files', it.fileId);
+              const nb = await applyEdits(f.blob, { crop: { x: .5 - side / it.w / 2, y: .5 - side / it.h / 2, w: side / it.w, h: side / it.h } });
+              const nf = uid();
+              await db.put('files', { id: nf, blob: nb });
+              it.fileId = nf; it.w = it.h = cw;
+            } else {
+              it.h = Math.max(30, Math.round(cw * it.h / it.w)); it.w = cw;
+            }
+          }
+          // 依欄高把圖片塞進最短的那一欄（瀑布流排列）
+          const cvw = (document.getElementById('cv')?.clientWidth || 800) - gap;
+          const cols = Math.max(1, Math.floor((cvw + gap) / (cw + gap)));
+          const colY = new Array(cols).fill(0);
+          for (const it of sorted) {
+            const c = colY.indexOf(Math.min(...colY));
+            it.x = c * (cw + gap); it.y = colY[c]; it.z = c + 1;
+            colY[c] += it.h + gap;
+          }
+          items = sorted; sel = null;
+          close(); save(); draw(); toast('已整理排列', 'success');
+        };
+      }
+    });
+  }
+
   function cropDialog(it) {
     push();
     modal(`<h3>裁切</h3><p class="muted">拖曳框選要保留的範圍</p>
@@ -138,7 +183,7 @@ export async function renderCanvas() {
         const wrap = bg.querySelector('#cr-wrap'), img = bg.querySelector('#cr-img');
         let r = null, box = null;
         img.onload = () => {
-          wrap.onmousedown = e => {
+          wrap.onpointerdown = e => {
             e.preventDefault();
             const b = img.getBoundingClientRect();
             const sx = e.clientX - b.left, sy = e.clientY - b.top;
@@ -152,8 +197,8 @@ export async function renderCanvas() {
               box.style.cssText += `;left:${x}px;top:${y}px;width:${w}px;height:${h}px`;
               r = { x: x / b.width, y: y / b.height, w: w / b.width, h: h / b.height };
             };
-            const up = () => { removeEventListener('mousemove', mv); removeEventListener('mouseup', up); };
-            addEventListener('mousemove', mv); addEventListener('mouseup', up);
+            const up = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); };
+            addEventListener('pointermove', mv); addEventListener('pointerup', up); addEventListener('pointercancel', up);
           };
         };
         bg.querySelector('#cr-ok').onclick = async () => {
