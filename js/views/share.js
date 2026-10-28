@@ -1,5 +1,6 @@
 // 公開分享頁：向分享伺服器取得資料，唯讀顯示，HTML 已消毒
 import { esc, sanitizeHTML } from '../util.js';
+import { volumeLabel } from '../chapters.js';
 
 export async function renderShare(token, chapterId) {
   const app = document.getElementById('app');
@@ -8,6 +9,9 @@ export async function renderShare(token, chapterId) {
     const r = await fetch(`/api/share/${token}`);
     if (!r.ok) throw new Error(r.status === 404 ? '分享不存在或已取消' : '載入失敗');
     const { type, payload } = await r.json();
+    // 分享連結也要輸入作品密碼
+    const { isLocked } = await import('../store.js');
+    if (isLocked(payload)) return (await import('../util.js')).lockNotice(payload);
     if (type === 'novel' && chapterId) {
       const ch = (payload.chapters || []).find(c => c.id === chapterId);
       if (!ch) throw new Error('章節不存在');
@@ -22,11 +26,15 @@ export async function renderShare(token, chapterId) {
       return;
     }
     if (type === 'novel') {
-      app.innerHTML = `<article class="card"><h1>${esc(payload.title)}</h1>
+      app.innerHTML = `<article class="card"><h1>${esc(payload.title)} ${payload.volume !== '' && payload.volume != null ? `<span class="vol-pill">${esc(volumeLabel(payload.volume))}</span>` : ''}</h1>
         <p class="muted">${esc(payload.author || '')} ・ ${(payload.chapters || []).length} 章</p>
         <p>${esc(payload.desc || '')}</p></article>
         <h2 class="section-title">目錄</h2>
         <div class="card">${(payload.chapters || []).map(c => `<div class="chapter-item"><a href="#/share/${token}/c/${c.id}" style="color:var(--text)">${esc(c.title)}</a></div>`).join('')}</div>`;
+    } else if (type === 'book') {
+      app.innerHTML = `<article class="card"><h1>${esc(payload.title)}</h1>
+        <p class="muted">${esc(payload.author || '')} ・ ${(payload.pages || []).length} 頁</p><p>${esc(payload.desc || '')}</p></article>
+        ${(payload.pages || []).map((p, i) => p.text ? `<div class="card" style="margin-top:.6rem"><small class="muted">第 ${i + 1} 頁</small><p style="white-space:pre-wrap;font-size:1.15em">${esc(p.text)}</p></div>` : '').join('')}`;
     } else if (type === 'diary') {
       app.innerHTML = `<article class="card"><h1>${esc(payload.title)}</h1>
         <p class="muted">${esc(payload.date || '')}</p><div>${sanitizeHTML(payload.content || '')}</div></article>`;

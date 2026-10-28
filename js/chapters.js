@@ -145,3 +145,59 @@ export function parseNovelMeta(text, fallbackTitle = '') {
   }
   return { title: title || fallbackTitle, author, desc };
 }
+
+// ---- 作品名稱排序：由低到高（1→9、A→Z），中文數字也照數值比（第二章 < 第十章）----
+const CN_DIGIT = { 零: 0, 〇: 0, 一: 1, 壹: 1, 二: 2, 兩: 2, 貳: 2, 三: 3, 參: 3, 四: 4, 肆: 4, 五: 5, 伍: 5, 六: 6, 陸: 6, 七: 7, 柒: 7, 八: 8, 捌: 8, 九: 9, 玖: 9 };
+const CN_UNIT = { 十: 10, 拾: 10, 百: 100, 千: 1000, 萬: 10000 };
+export function cnToInt(s) {
+  let total = 0, section = 0, digit = 0;
+  for (const ch of s) {
+    if (ch in CN_DIGIT) digit = CN_DIGIT[ch];
+    else if (ch === '萬') { total += (section + digit) * 10000; section = 0; digit = 0; }
+    else { section += (digit || 1) * CN_UNIT[ch]; digit = 0; }
+  }
+  return total + section + digit;
+}
+const toHalf = s => s.replace(/[０-９Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+const titleKey = s => toHalf(String(s ?? '').trim()).replace(/[零〇一二兩三四五六七八九十百千萬壹貳參肆伍陸柒捌玖拾]+/g, m => String(cnToInt(m)));
+const collator = new Intl.Collator('zh-Hant-TW', { numeric: true, sensitivity: 'base' });
+// 數字、英文開頭的排在中文開頭的前面
+const isHan = s => /^\p{Script=Han}/u.test(s);
+export function compareTitle(a, b) {
+  const ka = titleKey(a), kb = titleKey(b);
+  return (isHan(ka) - isHan(kb)) || collator.compare(ka, kb) || collator.compare(String(a ?? ''), String(b ?? ''));
+}
+
+// ---- 小說卷數：數字 1,2,3… 或「上/中/下/外傳/番外」----
+export const VOLUME_WORDS = ['上', '中', '下', '外傳', '番外'];
+const CN_NUM = '零一二三四五六七八九';
+export function intToCn(n) {
+  if (n < 10) return CN_NUM[n];
+  if (n < 20) return '十' + (n % 10 ? CN_NUM[n % 10] : '');
+  if (n < 100) return CN_NUM[Math.floor(n / 10)] + '十' + (n % 10 ? CN_NUM[n % 10] : '');
+  return String(n);
+}
+// 顯示文字：1 → 第一卷、'上' → 上卷、'外傳' → 外傳
+export function volumeLabel(v) {
+  if (v === '' || v == null) return '';
+  if (typeof v === 'number' || /^\d+$/.test(v)) return `第${intToCn(+v)}卷`;
+  return /^[上中下]$/.test(v) ? `${v}卷` : String(v);
+}
+// 排序權重：數字卷 < 上中下 < 外傳/番外；沒有卷數排最前
+export function volumeRank(v) {
+  if (v === '' || v == null) return -1;
+  if (typeof v === 'number' || /^\d+$/.test(v)) return +v;
+  const k = VOLUME_WORDS.indexOf(v);
+  return k < 0 ? 9999 : 5000 + k;
+}
+// 從書名取出卷數：「星海 第二卷」→ { title: '星海', volume: 2 }；沒有就原樣回傳
+const VOL_RE = /\s*[（(【\[〔]?\s*(?:第\s*([0-9０-９零〇一二兩三四五六七八九十百]+)\s*[卷冊部集]|卷\s*([0-9０-９一二兩三四五六七八九十]+)|vol(?:ume)?\.?\s*(\d+)|([上中下])\s*[卷冊部集]|[（(]([上中下])[）)]|(外傳|番外篇?))\s*[）)】\]〕]?\s*/i;
+export function splitVolume(title) {
+  const t = String(title || '');
+  const m = VOL_RE.exec(t);
+  if (!m) return { title: t.trim(), volume: '' };
+  const num = m[1] || m[2] || m[3];
+  const volume = num ? (/^[0-9０-９]+$/.test(num) ? +num.replace(/[０-９]/g, c => c.charCodeAt(0) - 0xFF10) : cnToInt(num)) : (m[4] || m[5] || m[6].replace(/篇$/, ''));
+  const rest = (t.slice(0, m.index) + ' ' + t.slice(m.index + m[0].length)).replace(/\s+/g, ' ').trim();
+  return rest ? { title: rest, volume } : { title: t.trim(), volume: '' };
+}

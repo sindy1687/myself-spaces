@@ -1,9 +1,11 @@
 // 資料層：作品 CRUD、分類、回收筒、設定、匯出匯入、示範資料
-import { db } from './db.js';
-import { uid, nowISO, blobToDataURL, dataURLToBlob } from './util.js';
+import { db, notifyChange } from './db.js';
+import { uid, nowISO, blobToDataURL, dataURLToBlob, isFid } from './util.js';
+import { compareTitle, volumeRank } from './chapters.js';
+import { authed } from './workspace.js';
 
 export const FORMAT_VERSION = 1;
-export const TYPES = { novel: 'novels', image: 'images', diary: 'diaries', craft: 'crafts' };
+export const TYPES = { novel: 'novels', image: 'images', diary: 'diaries', craft: 'crafts', book: 'books' };
 
 // ---- 設定 ----
 const DEFAULT_SETTINGS = {
@@ -19,9 +21,12 @@ export async function getSettings() {
   const s = await db.get('settings', 'site');
   return { ...DEFAULT_SETTINGS, ...(s?.value || {}) };
 }
+// 底線開頭的是本機用的紀錄（同步時間等），改它們不算「設定有變」
 export async function saveSettings(patch) {
   const cur = await getSettings();
-  await db.put('settings', { id: 'site', value: { ...cur, ...patch }, updatedAt: nowISO() });
+  const real = Object.keys(patch).some(k => !k.startsWith('_'));
+  await db.put('settings', { id: 'site', value: { ...cur, ...patch, ...(real ? { _srev: Date.now() } : {}) }, updatedAt: nowISO() });
+  if (real) notifyChange();
 }
 
 // ---- 分類（多層、欄位完整）----
@@ -129,22 +134,97 @@ export async function deleteTag(name) {
     }
   return n;
 }
+// ---- 隱私：未登入只看得到公開作品（私人＝預設）----
+const authedNow = authed;
+// 相簿可設「不公開」或密碼；相簿裡的圖片跟著相簿走（albumMap 由 refreshAlbums 更新）
+let albumMap = new Map();
+export async function refreshAlbums() { albumMap = new Map((await db.all('albums')).map(a => [a.id, a])); return albumMap; }
+const albumOf = it => (it?.albumId ? albumMap.get(it.albumId) : null);
+export const canViewAlbum = a => !!a && (a.visibility !== 'private' || authedNow());
+export const canView = it => !!it && (authedNow() || (it.visibility === 'public' && albumOf(it)?.visibility !== 'private'));
+
+// ---- 密碼保護：公開作品可另設密碼，訪客輸入正確密碼才看得到內容（作者登入後免輸入）----
+// 只存加鹽的 SHA-256，不存明碼；解鎖紀錄留在這個分頁（關掉瀏覽器就要重新輸入）
+const UNLOCK_KEY = 'unlocked';
+const unlockedIds = () => { try { return JSON.parse(sessionStorage.getItem(UNLOCK_KEY)) || []; } catch { return []; } };
+const hex = bytes => [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
+export async function hashPassword(pw, salt) {
+  const data = new TextEncoder().encode(`${salt}:${pw}`);
+  // 用區網 IP 以 http 開啟時沒有 crypto.subtle，改用純 JS 版本（結果相同）
+  return crypto.subtle ? hex(new Uint8Array(await crypto.subtle.digest('SHA-256', data))) : hex(sha256(data));
+}
+export function sha256(bytes) {
+  const K = [], H = [];
+  const frac = x => ((x - Math.floor(x)) * 2 ** 32) >>> 0;
+  for (let n = 2, c = 0; c < 64; n++) {
+    let p = true; for (let d = 2; d * d <= n; d++) if (n % d === 0) { p = false; break; }
+    if (p) { if (c < 8) H[c] = frac(n ** (1 / 2)); K[c++] = frac(n ** (1 / 3)); }
+  }
+  const len = bytes.length, total = ((len + 9 + 63) >> 6) << 6, m = new Uint8Array(total);
+  m.set(bytes); m[len] = 0x80;
+  const dv = new DataView(m.buffer);
+  dv.setUint32(total - 8, Math.floor(len / 2 ** 29)); dv.setUint32(total - 4, (len << 3) >>> 0);
+  const w = new Uint32Array(64), r = (x, n) => (x >>> n) | (x << (32 - n));
+  for (let o = 0; o < total; o += 64) {
+    for (let i = 0; i < 16; i++) w[i] = dv.getUint32(o + i * 4);
+    for (let i = 16; i < 64; i++) {
+      const a = w[i - 15], b = w[i - 2];
+      w[i] = (w[i - 16] + (r(a, 7) ^ r(a, 18) ^ (a >>> 3)) + w[i - 7] + (r(b, 17) ^ r(b, 19) ^ (b >>> 10))) >>> 0;
+    }
+    let [a, b, c, d, e, f, g, h] = H;
+    for (let i = 0; i < 64; i++) {
+      const t1 = (h + (r(e, 6) ^ r(e, 11) ^ r(e, 25)) + ((e & f) ^ (~e & g)) + K[i] + w[i]) >>> 0;
+      const t2 = ((r(a, 2) ^ r(a, 13) ^ r(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) >>> 0;
+      [h, g, f, e, d, c, b, a] = [g, f, e, (d + t1) >>> 0, c, b, a, (t1 + t2) >>> 0];
+    }
+    [a, b, c, d, e, f, g, h].forEach((v, i) => { H[i] = (H[i] + v) >>> 0; });
+  }
+  const out = new Uint8Array(32), odv = new DataView(out.buffer);
+  H.forEach((v, i) => odv.setUint32(i * 4, v));
+  return out;
+}
+export async function makeLock(pw, hint = '') {
+  const salt = hex(crypto.getRandomValues(new Uint8Array(12)));
+  return { salt, hash: await hashPassword(pw, salt), ...(hint ? { hint } : {}) };
+}
+const ownLocked = it => !!it?.lock?.hash && !unlockedIds().includes(it.id);
+export const isLocked = it => !authedNow() && (ownLocked(it) || ownLocked(albumOf(it)));
+// 這件作品要輸入哪一組密碼（自己的，或所在相簿的）
+export const lockOf = it => (ownLocked(it) ? it : ownLocked(albumOf(it)) ? albumOf(it) : null);
+// 還沒解鎖的圖片所用到的檔案（含編輯版本、原圖），各處縮圖都改顯示鎖頭
+export async function lockedFileIds() {
+  const out = new Set();
+  await refreshAlbums();
+  for (const im of await db.all('images')) if (isLocked(im))
+    for (const f of [im.fileId, im.origFileId, ...(im.versions || []).map(v => v.fileId)]) if (f) out.add(f);
+  return out;
+}
+export async function tryUnlock(item, pw) {
+  const it = lockOf(item) || item;
+  if (!it?.lock?.hash || await hashPassword(pw, it.lock.salt) !== it.lock.hash) return false;
+  try { sessionStorage.setItem(UNLOCK_KEY, JSON.stringify([...new Set([...unlockedIds(), it.id])])); } catch { /* 無痕模式 */ }
+  return true;
+}
+
 export async function allWorks() {
   const out = [];
-  for (const [t, s] of Object.entries(TYPES)) for (const it of await db.all(s)) if (!it.deleted) out.push({ type: t, ...it });
-  return out;
+  await refreshAlbums();
+  for (const [t, s] of Object.entries(TYPES)) for (const it of await db.all(s)) if (!it.deleted && canView(it)) out.push({ type: t, ...it });
+  return out.sort(byTitle);
 }
 
 // ---- 作品通用 ----
+// 列表一律依名稱由低到高（1→9、A→Z）；首頁「最新作品」另行依更新時間排序
+const byTitle = (a, b) => compareTitle(a.title || a.name, b.title || b.name) || volumeRank(a.volume) - volumeRank(b.volume);
 export async function list(type) {
-  const items = await db.all(TYPES[type]);
-  return items.filter(i => !i.deleted).sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+  const [items] = await Promise.all([db.all(TYPES[type]), refreshAlbums()]);
+  return items.filter(i => !i.deleted && canView(i)).sort(byTitle);
 }
 export async function get(type, id) { return db.get(TYPES[type], id); }
 export async function save(type, obj) {
   const o = { ...obj, updatedAt: nowISO() };
   if (!o.id) { o.id = uid(); o.createdAt = o.updatedAt; }
-  if (o.visibility === undefined) o.visibility = 'private';
+  if (o.visibility === undefined) o.visibility = (await getSettings()).defaultVisibility === 'public' ? 'public' : 'private';
   await db.put(TYPES[type], o);
   return o;
 }
@@ -171,6 +251,8 @@ export async function purge(trashId) {
   if (item?.fileId) await db.del('files', item.fileId);
   if (item?.origFileId) await db.del('files', item.origFileId);
   for (const v of item?.versions || []) if (v.fileId) await db.del('files', v.fileId);
+  // 繪本頁面在編輯器直接上傳的圖（不在畫廊裡）一併刪除；從畫廊選的圖不動
+  for (const p of item?.pages || []) if (p.ownFile && p.image) await db.del('files', p.image);
   await db.del(TYPES[t.type], t.itemId);
   await db.del('trash', trashId);
 }
@@ -188,22 +270,27 @@ export const getProgress = novelId => db.get('progress', novelId);
 // ---- 匯出 / 匯入 ----
 export async function exportAll() {
   const out = { formatVersion: FORMAT_VERSION, exportedAt: nowISO(), settings: await getSettings(), categories: await db.all('categories'), novels: [], images: [], albums: await db.all('albums'), diaries: [], progress: await db.all('progress') };
-  out.novels = (await db.all('novels')).filter(n => !n.deleted);
-  out.diaries = (await db.all('diaries')).filter(d => !d.deleted);
-  out.crafts = (await db.all('crafts')).filter(c => !c.deleted);
+  // 回收筒裡的作品也一起帶著（標記 deleted），別台裝置才知道它被刪了
+  out.novels = await db.all('novels');
+  out.diaries = await db.all('diaries');
+  out.crafts = await db.all('crafts');
+  out.books = await db.all('books');
+  out.tombstones = (await db.get('settings', 'tombstones'))?.list || [];
   // 內文引用的媒體檔案（data-fid）一併匯出
   out.mediaFiles = [];
   const fids = new Set();
-  for (const it of [...out.diaries, ...out.crafts])
+  for (const it of [...out.diaries, ...out.crafts].filter(x => !x.deleted))
     for (const m of (it.content || '').matchAll(/data-fid="([^"]+)"/g)) fids.add(m[1]);
+  // 繪本頁面直接上傳的圖（畫廊選的圖已隨 images 匯出）
+  for (const b of out.books.filter(x => !x.deleted)) for (const p of b.pages || []) if (p.ownFile && isFid(p.image)) fids.add(p.image);
   for (const c of (out.settings.customStickers || [])) fids.add(c.fileId);
   for (const c of (out.settings.canvasItems || [])) fids.add(c.fileId);
   for (const fid of fids) {
     const f = await db.get('files', fid);
     if (f) out.mediaFiles.push({ id: fid, data: await blobToDataURL(f.blob) });
   }
-  const imgs = (await db.all('images')).filter(i => !i.deleted);
-  for (const im of imgs) {
+  for (const im of await db.all('images')) {
+    if (im.deleted) { out.images.push({ ...im, data: null }); continue; } // 已刪除：只帶標記，不帶圖檔
     const blob = await db.get('files', im.fileId);
     const e = { ...im, data: blob ? await blobToDataURL(blob.blob) : null, versions: [] };
     if (im.origFileId) { const ob = await db.get('files', im.origFileId); e.origData = ob ? await blobToDataURL(ob.blob) : null; }
@@ -222,11 +309,12 @@ export async function importAll(data, { merge = true } = {}) {
   const { validateImport } = await import('./category-utils.js');
   const problems = validateImport(data, new Set((await db.all('categories')).map(c => c.id)));
   if (problems.length) console.warn('匯入檢查', problems);
-  if (!merge) for (const s of ['novels','images','albums','diaries','crafts','categories','progress','trash']) await db.clear(s);
+  if (!merge) for (const s of ['novels','images','albums','diaries','crafts','books','categories','progress','trash']) await db.clear(s);
   for (const c of data.categories || []) await db.put('categories', c);
   for (const n of data.novels || []) await db.put('novels', n);
   for (const d of data.diaries || []) await db.put('diaries', d);
   for (const c of data.crafts || []) await db.put('crafts', c);
+  for (const b of data.books || []) await db.put('books', b);
   for (const f of data.mediaFiles || []) if (f.data) await db.put('files', { id: f.id, blob: dataURLToBlob(f.data) });
   for (const a of data.albums || []) await db.put('albums', a);
   for (const p of data.progress || []) await db.put('progress', p);

@@ -1,6 +1,10 @@
 // Google Drive 同步（OAuth + Drive API, scope: drive.file）
 // 需要使用者在管理後台填入自己的 OAuth Client ID（Web 應用程式類型，不需 secret）
 import { exportAll, importAll, getSettings, saveSettings } from './store.js';
+import { WS, wsKey } from './workspace.js';
+
+// 讀取網址加上 u=名字（其他人的網站讀他自己的資料檔）
+const withUser = (url, extra = '') => url + (url.includes('?') ? '&' : '?') + [WS ? 'u=' + encodeURIComponent(WS) : '', extra].filter(Boolean).join('&');
 import { db } from './db.js';
 import { blobToDataURL, dataURLToBlob } from './util.js';
 
@@ -204,7 +208,7 @@ export async function resolveConflict(choice) {
 
 // ---- 經由 Google Apps Script Web App 上傳/讀取（免 OAuth）----
 export async function loadViaAppsScript(webAppUrl) {
-  const r = await fetch(webAppUrl); // GET 回傳最新完整備份
+  const r = await fetch(WS ? withUser(webAppUrl) : webAppUrl); // GET 回傳最新完整備份
   const res = await r.json();
   if (!res.ok) throw new Error(res.error || '讀取失敗');
   return res.data;
@@ -216,7 +220,7 @@ export async function autoLoadFromDrive() {
   if (!s.gasUrl) return false;
   try {
     // 先只問遠端版本時間（輕量）；舊版 Apps Script 不認得 meta 參數，會直接回傳完整備份
-    const head = await fetch(s.gasUrl + (s.gasUrl.includes('?') ? '&' : '?') + 'meta=1').then(r => r.json());
+    const head = await fetch(withUser(s.gasUrl, 'meta=1')).then(r => r.json());
     if (!head.ok) throw new Error(head.error || '讀取失敗');
     const stamp = head.exportedAt || head.data?.exportedAt;
     if (!stamp || stamp <= (s._appliedRemote || '')) return false; // 已是最新
@@ -227,15 +231,39 @@ export async function autoLoadFromDrive() {
     return true;
   } catch (e) { console.warn('Drive 自動載入失敗', e); return false; }
 }
+// data URL 解碼後的位元組數（和雲端檔案大小比對用）
+export function dataUrlSize(d) {
+  const b64 = String(d || '').split(',')[1] || '';
+  return Math.floor(b64.length * 3 / 4) - (b64.endsWith('==') ? 2 : b64.endsWith('=') ? 1 : 0);
+}
+// 文字資料的指紋：去掉每次都會變的時間戳與同步紀錄，內容一樣指紋就一樣
+export function fingerprint(data) {
+  const { exportedAt, ...rest } = data;
+  const settings = Object.fromEntries(Object.entries(rest.settings || {}).filter(([k]) => !k.startsWith('_')));
+  const s = JSON.stringify({ ...rest, settings });
+  let h1 = 0x811c9dc5, h2 = 0;
+  for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); h1 = Math.imul(h1 ^ c, 16777619); h2 = (h2 * 31 + c) | 0; }
+  return (h1 >>> 0).toString(36) + (h2 >>> 0).toString(36) + s.length.toString(36);
+}
+const LAST_KEY = 'last-upload' + (WS ? '@' + WS : '');
+const lastUpload = () => { try { return JSON.parse(localStorage.getItem(LAST_KEY)) || {}; } catch { return {}; } };
+const saveLastUpload = v => { try { localStorage.setItem(LAST_KEY, JSON.stringify(v)); } catch { /* 無痕模式 */ } };
+
 // 分批上傳：data.json 一次；圖片/媒體每批 ~5MB 逐次 POST（避免 Apps Script 請求上限）
-export async function uploadViaAppsScript(webAppUrl, folderId) {
+// deps 讓測試可以換掉匯出與存設定
+export async function uploadViaAppsScript(webAppUrl, folderId, deps = {}) {
+  const doExport = deps.exportAll || exportAll, doSave = deps.saveSettings || saveSettings;
   setState({ status: 'syncing', progress: '匯出資料中…', error: null });
   const post = payload => fetch(webAppUrl, {
     method: 'POST', headers: { 'Content-Type': 'text/plain' }, // 避免 CORS preflight
-    body: JSON.stringify(payload),
-  }).then(r => r.json()).then(res => { if (!res.ok) throw new Error(res.error || 'Apps Script 回傳錯誤'); return res; });
+    // 其他人的網站：帶上帳號與金鑰，Apps Script 只讓本人寫入自己的資料夾
+    body: JSON.stringify(WS ? { ...payload, u: WS, key: wsKey() } : payload),
+  }).then(r => r.json()).then(res => {
+    if (res.code === 'bad-login') throw new Error('登入已失效，請登出後重新登入再上傳');
+    if (!res.ok) throw new Error(res.error || 'Apps Script 回傳錯誤'); return res;
+  });
   try {
-    const data = await exportAll();
+    const data = await doExport();
     // 抽離所有檔案：圖片（主圖/原檔/版本）＋內文媒體檔
     const files = [];
     data.images = data.images.map(im => {
@@ -247,17 +275,33 @@ export async function uploadViaAppsScript(webAppUrl, folderId) {
     for (const mf of data.mediaFiles || []) if (mf.data) files.push(mf);
     data.mediaFiles = (data.mediaFiles || []).map(mf => ({ id: mf.id, data: null }));
 
-    setState({ progress: '上傳文字資料…' });
-    await post({ action: 'putJson', folderId, data });
+    // 只上傳雲端還沒有的：先問雲端有哪些檔案（同一個 id 的內容不會變，大小相同就跳過）
+    setState({ progress: '比對雲端已有的資料…' });
+    let remote = null;
+    try { remote = await post({ action: 'listFiles', folderId }); } catch { /* 舊版 Apps Script：全部上傳 */ }
+    const todo = remote ? files.filter(f => remote.files?.[f.id] !== dataUrlSize(f.data)) : files;
+
+    // 文字資料沒變、雲端也還是上次傳的那一份，就不重傳
+    const fp = fingerprint(data), last = lastUpload();
+    const jsonSame = remote?.hasData && last.fp === fp && last.at && last.at === remote.exportedAt;
+    if (!jsonSame) {
+      setState({ progress: '上傳文字資料…' });
+      await post({ action: 'putJson', folderId, data });
+    }
 
     let sent = 0;
-    for (const f of files) {
-      setState({ progress: `上傳檔案 ${++sent}/${files.length}…` });
+    for (const f of todo) {
+      setState({ progress: `上傳新檔案 ${++sent}/${todo.length}…` });
       await post({ action: 'putFile', folderId, id: f.id, data: f.data });
     }
-    await saveSettings({ _appliedRemote: data.exportedAt });
-    setState({ status: 'connected', lastSync: new Date().toISOString(), progress: `已上傳（${files.length} 個檔案）` });
-    return { ok: true, images: files.length };
+    const at = jsonSame ? last.at : data.exportedAt;
+    saveLastUpload({ fp, at });
+    if (!jsonSame) await doSave({ _appliedRemote: data.exportedAt });
+    const skipped = files.length - todo.length;
+    const msg = jsonSame && !todo.length ? '雲端已經是最新的，沒有需要上傳的資料'
+      : `已上傳${jsonSame ? '' : '文字資料、'}${todo.length} 個新檔案${skipped ? `（${skipped} 個雲端已有，略過）` : ''}`;
+    setState({ status: 'connected', lastSync: new Date().toISOString(), progress: msg });
+    return { ok: true, images: todo.length, skipped, jsonSkipped: jsonSame, message: msg };
   } catch (e) {
     setState({ status: 'error', error: e.message, progress: '' });
     throw e;

@@ -10,6 +10,13 @@ export async function renderCanvas() {
   const s = await getSettings();
   const app = document.getElementById('app');
   let items = s.canvasItems || [];
+  // 未登入（只能看）時拿掉私人圖片；登入編輯時保留全部，避免存檔時弄丟
+  if (!isAuthed()) {
+    const { db } = await import('../db.js'), { canView } = await import('../store.js');
+    await (await import('../store.js')).refreshAlbums();
+    const hidden = new Set((await db.all('images')).filter(i => !canView(i)).map(i => i.fileId));
+    items = items.filter(it => !hidden.has(it.fileId));
+  }
   let mode = isAuthed() ? 'edit' : 'view';
   let sel = null;
   const undoStack = [];

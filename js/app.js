@@ -5,12 +5,15 @@ import { renderNovels, renderNovelDetail, renderReader, renderNovelImport } from
 import { renderGallery, renderImageDetail, renderAlbum } from './views/gallery.js';
 import { renderDiary } from './views/diary.js';
 import { renderCrafts } from './views/craft.js';
+import { renderBooks, renderBook } from './views/book.js';
 import { renderCanvas } from './views/canvas.js';
 import { renderAdmin } from './views/admin.js';
 import { renderShare } from './views/share.js';
 import { esc, toast } from './util.js';
+import { WS } from './workspace.js';
 
 const app = document.getElementById('app');
+const IS_PREVIEW = new URLSearchParams(location.search).has('preview');
 
 const routes = [
   [/^#?\/?(?:\?.*)?$/, renderHome],
@@ -23,6 +26,8 @@ const routes = [
   [/^#\/album\/([\w-]+)(?:\?.*)?$/, m => renderAlbum(m[1])],
   [/^#\/diary(?:\?.*)?$/, renderDiary],
   [/^#\/crafts(?:\?.*)?$/, renderCrafts],
+  [/^#\/books(?:\?.*)?$/, renderBooks],
+  [/^#\/book\/([\w-]+)(?:\?.*)?$/, m => renderBook(m[1])],
   [/^#\/canvas(?:\?.*)?$/, renderCanvas],
   [/^#\/category\/([\w-]+)/, m => renderCategory(m[1])],
   [/^#\/search/, renderSearch],
@@ -34,7 +39,8 @@ export function navigate() {
   const hash = location.hash || '#/';
   for (const [re, fn] of routes) {
     const m = hash.match(re);
-    if (m) { fn(m); app.focus(); return; }
+    // 焦點移到主內容給螢幕閱讀器；不捲動畫面。後台縮圖（?preview）不搶焦點，否則外層頁面會被拉過去
+    if (m) { fn(m); if (!IS_PREVIEW) app.focus({ preventScroll: true }); return; }
   }
   app.innerHTML = '<div class="empty"><h2>找不到頁面</h2><a href="#/">回首頁</a></div>';
 }
@@ -60,13 +66,22 @@ export function pageShell(title, inner) {
 
 async function boot() {
   const s = await getSettings();
+  // 其他人的新網站：不放示範資料，網站名稱先用「名字 的作品空間」
+  if (WS && !s.demoLoaded) { Object.assign(s, { demoLoaded: true, siteName: `${WS} 的作品空間` }); await saveSettings({ demoLoaded: true, siteName: s.siteName }); }
+  // ?preview=範本：後台縮圖用，以指定範本、範本預設主色顯示，不做 Drive 同步
+  const preview = new URLSearchParams(location.search).get('preview');
+  if (preview) Object.assign(s, { theme: preview, primaryColor: '' });
   const applyTheme = t => {
     document.body.dataset.theme = t.theme || 'literary';
     document.body.dataset.deco = t.deco || 'standard';
     document.body.classList.toggle('no-anim', t.anim === false);
     if (t.primaryColor) document.documentElement.style.setProperty('--primary', t.primaryColor);
+    else document.documentElement.style.removeProperty('--primary');
   };
   applyTheme(s);
+  const prefs = () => import('./site-prefs.js').then(m => m.applySitePrefs(s2 || s)).catch(e => console.warn('網站設定', e));
+  let s2 = null;
+  prefs();
   document.getElementById('site-title').textContent = s.siteName;
   document.title = s.siteName;
   if (!s.demoLoaded) {
@@ -75,19 +90,24 @@ async function boot() {
   }
   window.addEventListener('hashchange', navigate);
   navigate();
-  // 背景從 Google Drive（Apps Script）同步，不擋首屏；有更新才重繪
+  if (preview) return;
+  import('./music.js').then(m => m.initMusic()).catch(e => console.warn('背景音樂', e));
+  // 多裝置自動同步：不擋首屏；雲端有新資料就套用並刷新畫面，登入後本機一改就自動上傳
+  const applied = async () => {
+    s2 = await getSettings();
+    applyTheme(s2); prefs();
+    document.getElementById('site-title').textContent = s2.siteName;
+    document.title = s2.siteName;
+    // 正在編輯、聽書時不重繪，以免蓋掉正在輸入的內容或打斷朗讀
+    if (document.getElementById('modal-root').children.length || document.querySelector('.listen-bar, [contenteditable="true"]:focus')) return toast('有新的內容，重新整理即可看到');
+    const y = scrollY;
+    navigate();
+    requestAnimationFrame(() => scrollTo(0, y));
+  };
   try {
-    const { autoLoadFromDrive } = await import('./gdrive.js');
-    if (await autoLoadFromDrive()) {
-      const s2 = await getSettings();
-      applyTheme(s2);
-      document.getElementById('site-title').textContent = s2.siteName;
-      document.title = s2.siteName;
-      // 開著編輯視窗時不重繪，以免蓋掉正在輸入的內容
-      if (document.getElementById('modal-root').children.length) toast('Drive 有新資料，重新整理即可看到');
-      else navigate();
-      console.log('已從 Drive 載入最新資料');
-    }
-  } catch (e) { console.warn(e); }
+    const sync = await import('./sync.js');
+    sync.startSync(applied);
+    import('./sync-badge.js').then(m => m.mountSyncBadge(sync)).catch(e => console.warn(e));
+  } catch (e) { console.warn('同步', e); }
 }
 boot();

@@ -39,7 +39,34 @@ export async function applyEdits(srcBlob, edits) {
   } finally { URL.revokeObjectURL(url); }
 }
 
-export const IMAGE_LIMIT = { maxSize: 15 * 1024 * 1024, types: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif', 'image/bmp'] };
+// ---- 裁切框（座標皆為 0~1 比例；rf = 固定比例換算成比例座標的寬/高，null 為自由）----
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+// 置中、盡量大的裁切框
+export function fitCrop(rf = null) {
+  if (!rf) return { x: 0, y: 0, w: 1, h: 1 };
+  let w = 1, h = 1 / rf;
+  if (h > 1) { h = 1; w = rf; }
+  return { x: (1 - w) / 2, y: (1 - h) / 2, w, h };
+}
+// 拖曳裁切框：handle 為 move 或 n/s/e/w 組合；固定比例時只用四角，對角固定不動
+export function moveCrop(c, handle, dx, dy, rf = null, min = 0.05) {
+  if (handle === 'move') return { ...c, x: clamp(c.x + dx, 0, 1 - c.w), y: clamp(c.y + dy, 0, 1 - c.h) };
+  let l = c.x, t = c.y, r = c.x + c.w, b = c.y + c.h;
+  if (handle.includes('w')) l = clamp(l + dx, 0, r - min);
+  if (handle.includes('e')) r = clamp(r + dx, l + min, 1);
+  if (handle.includes('n')) t = clamp(t + dy, 0, b - min);
+  if (handle.includes('s')) b = clamp(b + dy, t + min, 1);
+  if (rf) {
+    const maxH = handle.includes('n') ? b : 1 - t;
+    let w = r - l, h = w / rf;
+    if (h > maxH) { h = maxH; w = h * rf; }
+    if (handle.includes('w')) l = r - w; else r = l + w;
+    if (handle.includes('n')) t = b - h; else b = t + h;
+  }
+  return { x: l, y: t, w: r - l, h: b - t };
+}
+
+export const IMAGE_LIMIT ={ maxSize: 15 * 1024 * 1024, types: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif', 'image/bmp'] };
 export function validateImage(file) {
   if (!IMAGE_LIMIT.types.includes(file.type)) return `不支援的格式 ${file.type || file.name}（支援 JPG/PNG/GIF/WebP/AVIF/BMP）`;
   if (file.size > IMAGE_LIMIT.maxSize) return `「${file.name}」超過 15MB 上限`;
@@ -48,9 +75,11 @@ export function validateImage(file) {
 
 // 上傳前縮小：EXIF 方向、等比例、品質、透明背景
 // 回傳 {blob, width, height, size, format} ；GIF 動畫不縮（回傳 original）
-export async function resizeImageFile(file, { maxSide = 1920, quality = 85, format = 'keep', bg = '#ffffff' } = {}) {
+// crop = {x,y,w,h}（0~1 比例）：先裁切再縮小
+export async function resizeImageFile(file, { maxSide = 1920, quality = 85, format = 'keep', bg = '#ffffff', crop = null } = {}) {
   const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
-  const { width: w, height: h } = bmp;
+  const sx = crop ? Math.round(crop.x * bmp.width) : 0, sy = crop ? Math.round(crop.y * bmp.height) : 0;
+  const w = crop ? Math.max(1, Math.round(crop.w * bmp.width)) : bmp.width, h = crop ? Math.max(1, Math.round(crop.h * bmp.height)) : bmp.height;
   const scale = Math.min(1, maxSide / Math.max(w, h));
   const ow = Math.round(w * scale), oh = Math.round(h * scale);
   const keepAlpha = format === 'keep' && /png|webp|gif/i.test(file.type);
@@ -59,7 +88,7 @@ export async function resizeImageFile(file, { maxSide = 1920, quality = 85, form
   c.width = ow; c.height = oh;
   const ctx = c.getContext('2d');
   if (!keepAlpha && outType === 'image/jpeg') { ctx.fillStyle = bg; ctx.fillRect(0, 0, ow, oh); }
-  ctx.drawImage(bmp, 0, 0, ow, oh);
+  ctx.drawImage(bmp, sx, sy, w, h, 0, 0, ow, oh);
   bmp.close();
   const q = (outType === 'image/jpeg' || outType === 'image/webp') ? quality / 100 : undefined;
   const blob = await new Promise(res => c.toBlob(res, outType, q));

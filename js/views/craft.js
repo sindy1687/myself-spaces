@@ -1,9 +1,10 @@
 // 手作手札：清單、詳情、富文字編輯器（材料/工具/步驟/心得）
-import { list, get, save, trash, listCategories } from '../store.js';
+import { list, get, save, trash, listCategories, canView, isLocked } from '../store.js';
 import { db } from '../db.js';
-import { esc, uid, modal, toast, confirmDialog, fmtDate, sanitizeHTML, attachUploadBtn, richToolbar, hydrateMedia, isFid } from '../util.js';
+import { esc, uid, modal, toast, confirmDialog, fmtDate, sanitizeHTML, attachUploadBtn, richToolbar, hydrateMedia, isFid, initialOf, privateNotice, lockNotice, lockBadge } from '../util.js';
 import { shareDialog, countView, catChips, bindCatChips } from './novel.js';
 import { isAuthed } from '../auth.js';
+import { selectMode } from '../select-mode.js';
 import { setNav } from './home.js';
 
 const STATUSES = ['規劃中', '製作中', '已完成', '暫停'];
@@ -23,22 +24,28 @@ export async function renderCrafts() {
   const [items, cats] = await Promise.all([list('craft'), listCategories('craft')]);
   const shown = items.filter(i =>
     (!cat || (cat === 'uncategorized' ? !(i.categoryIds || []).length : i.categoryIds.includes(cat))) &&
-    (!kw || (i.title + (i.content || '')).includes(kw)));
+    (!kw || (i.title + (isLocked(i) ? '' : i.content || '')).includes(kw)));
   app.innerHTML = `
     <div class="row"><h1 style="margin-right:auto">手作手札</h1>
       <form id="cf"><input name="q" placeholder="關鍵字" value="${esc(kw)}" style="max-width:160px"><button>搜尋</button></form>
-      ${isAuthed() ? '<button id="new-c" class="primary">＋ 新增手札</button>' : ''}</div>
+      ${isAuthed() ? '<button id="sel-btn">☑ 選取</button><button id="new-c" class="primary">＋ 新增手札</button>' : ''}</div>
     ${catChips(cats, 'craft', '#/crafts', cat)}
     <div class="grid" style="margin-top:1rem">${shown.map(c => `
-      <a class="card" href="#/crafts?open=${c.id}" style="color:var(--text)">
-        ${(() => { const cv = c.cover || (/<img[^>]+(?:data-fid|src)="([^"]+)"/.exec(c.content || '') || [])[1]; if (!cv) return `<div class="cover" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:2rem">${esc(c.title[0])}</div>`; return isFid(cv) ? `<img class="cover" data-fid="${esc(cv)}" alt="">` : `<img class="cover" src="${esc(cv)}" alt="">`; })()}
-        <h3>${esc(c.title)} ${c.demo ? '<span class="tag">示範</span>' : ''} ${c.status === 'draft' ? '<span class="tag">草稿</span>' : ''}</h3>
+      <a class="card" href="#/crafts?open=${c.id}" data-sel="${c.id}" style="color:var(--text)">
+        ${(() => { const cv = isLocked(c) ? '' : c.cover || (/<img[^>]+(?:data-fid|src)="([^"]+)"/.exec(c.content || '') || [])[1]; if (!cv) return `<div class="cover" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:2rem">${esc(initialOf(c.title))}</div>`; return isFid(cv) ? `<img class="cover" data-fid="${esc(cv)}" alt="">` : `<img class="cover" src="${esc(cv)}" alt="">`; })()}
+        <h3>${esc(c.title)}${lockBadge(c)} ${c.demo ? '<span class="tag">示範</span>' : ''} ${c.status === 'draft' ? '<span class="tag">草稿</span>' : ''}</h3>
         <div><span class="badge ${c.status === '已完成' ? 'badge-done' : c.status === '暫停' ? 'badge-pause' : 'badge-serial'}">${esc(c.status || '製作中')}</span></div>
         <p class="muted">${esc(c.date || '')} ・ ${esc(c.desc || '')}</p>
       </a>`).join('') || '<div class="empty">尚無手札</div>'}</div>`;
   document.getElementById('cf').onsubmit = e => { e.preventDefault(); location.hash = `#/crafts?q=${encodeURIComponent(new FormData(e.target).get('q'))}`; };
   document.getElementById('new-c')?.addEventListener('click', () => editor(cat && cat !== 'uncategorized' ? { categoryIds: [cat] } : null));
   bindCatChips('craft', renderCrafts);
+  selectMode({
+    button: document.getElementById('sel-btn'), root: app.querySelector('.grid') || app, actions: [
+      { label: '🗑 刪除', danger: true, confirm: n => `把選取的 ${n} 篇手札移到回收筒？（可在「管理 → 回收筒」還原）`,
+        run: async ids => { for (const id of ids) await trash('craft', id); toast(`已刪除 ${ids.length} 篇`, 'success'); renderCrafts(); } },
+    ],
+  });
   setNav();
   hydrateMedia(document.getElementById('app'));
 }
@@ -47,6 +54,8 @@ async function renderCraftEntry(id) {
   const c = await get('craft', id);
   const app = document.getElementById('app');
   if (!c) return app.innerHTML = '<div class="empty">找不到這篇手札</div>';
+  if (!canView(c)) return privateNotice();
+  if (isLocked(c)) return lockNotice(c);
   app.innerHTML = `
     <article class="card">
       <h1>${esc(c.title)}</h1>

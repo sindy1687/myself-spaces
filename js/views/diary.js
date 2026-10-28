@@ -1,10 +1,11 @@
 // 日記：清單/月曆、編輯器（標題/段落/清單/引用/連結/插入圖片）、草稿
-import { list, get, save, trash, listCategories } from '../store.js';
+import { list, get, save, trash, listCategories, canView, isLocked } from '../store.js';
 import { db } from '../db.js';
-import { esc, uid, modal, toast, confirmDialog, sanitizeHTML, attachUploadBtn, richToolbar, hydrateMedia, isFid } from '../util.js';
+import { esc, uid, modal, toast, confirmDialog, sanitizeHTML, attachUploadBtn, richToolbar, hydrateMedia, isFid, privateNotice, lockNotice, lockBadge } from '../util.js';
 import { shareDialog, countView, catChips, bindCatChips } from './novel.js';
 import { setNav } from './home.js';
 import { isAuthed } from '../auth.js';
+import { selectMode } from '../select-mode.js';
 
 const MOODS = ['開心', '平靜', '期待', '疲憊', '難過', '生氣', '感恩'];
 const WEATHERS = ['晴', '陰', '雨', '雪', '多雲', '風'];
@@ -23,7 +24,7 @@ export async function renderDiary() {
   if (cat) sessionStorage.setItem('cat:diary', cat);
   const filtered = diaries.filter(d =>
     d.status !== 'draft' &&
-    (!kw || (d.title + d.content).includes(kw)) &&
+    (!kw || (d.title + (isLocked(d) ? '' : d.content || '')).includes(kw)) &&
     (!cat || (d.categoryIds || []).includes(cat)) &&
     (!tag || (d.tags || []).includes(tag)));
 
@@ -31,7 +32,7 @@ export async function renderDiary() {
     <div class="row"><h1 style="margin-right:auto">日記</h1>
       <a href="#/diary?view=list"><button class="${view === 'list' ? 'primary' : ''}">清單</button></a>
       <a href="#/diary?view=calendar"><button class="${view === 'calendar' ? 'primary' : ''}">月曆</button></a>
-      ${isAuthed() ? '<button id="new-d" class="primary">＋ 寫日記</button>' : ''}</div>
+      ${isAuthed() ? `<button id="sel-btn" ${view === 'calendar' ? 'class="hidden"' : ''}>☑ 選取</button><button id="new-d" class="primary">＋ 寫日記</button>` : ''}</div>
     <form id="df" class="row" style="margin:.8rem 0">
       <input name="q" placeholder="關鍵字" value="${esc(kw)}" style="max-width:200px">
       <select name="cat" style="max-width:150px"><option value="">全部分類</option>${cats.map(c => `<option value="${c.id}" ${c.id === cat ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
@@ -67,13 +68,19 @@ export async function renderDiary() {
     dv.querySelectorAll('.day.has').forEach(el => el.onclick = () => { const d = byDay[el.dataset.date][0]; location.hash = `#/diary?open=${d.id}`; });
   } else {
     dv.innerHTML = filtered.length ? filtered.map(d => `
-      <a class="card row" href="#/diary?open=${d.id}" style="color:var(--text);margin-bottom:.6rem;display:flex">
-        ${(() => { const cv = d.cover || (/<img[^>]+(?:data-fid|src)="([^"]+)"/.exec(d.content || '') || [])[1]; if (!cv) return ''; const fid = isFid(cv) ? cv : null; return fid ? `<img data-fid="${esc(fid)}" style="width:72px;height:72px;object-fit:cover;border-radius:8px" alt="">` : `<img src="${esc(cv)}" style="width:72px;height:72px;object-fit:cover;border-radius:8px" alt="">`; })()}
-        <div style="flex:1"><b>${esc(d.title)}</b> ${d.demo ? '<span class="tag">示範</span>' : ''}
+      <a class="card row" href="#/diary?open=${d.id}" data-sel="${d.id}" style="color:var(--text);margin-bottom:.6rem;display:flex;position:relative">
+        ${(() => { const cv = d.cover || (/<img[^>]+(?:data-fid|src)="([^"]+)"/.exec(d.content || '') || [])[1]; if (!cv) return ''; if (isLocked(d)) return '<span class="lock-thumb">🔒</span>'; const fid = isFid(cv) ? cv : null; return fid ? `<img data-fid="${esc(fid)}" style="width:72px;height:72px;object-fit:cover;border-radius:8px" alt="">` : `<img src="${esc(cv)}" style="width:72px;height:72px;object-fit:cover;border-radius:8px" alt="">`; })()}
+        <div style="flex:1"><b>${esc(d.title)}</b>${lockBadge(d)} ${d.demo ? '<span class="tag">示範</span>' : ''}
           <div class="muted">${esc(d.date || '')} ・ ${esc(d.mood || '')} ${esc(d.weather || '')} ・ ${(d.tags || []).map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
         </div></a>`).join('') : '<div class="empty">沒有日記</div>';
   }
   hydrateMedia(app);
+  if (view !== 'calendar') selectMode({
+    button: document.getElementById('sel-btn'), root: dv, actions: [
+      { label: '🗑 刪除', danger: true, confirm: n => `把選取的 ${n} 篇日記移到回收筒？（可在「管理 → 回收筒」還原）`,
+        run: async ids => { for (const id of ids) await trash('diary', id); toast(`已刪除 ${ids.length} 篇`, 'success'); renderDiary(); } },
+    ],
+  });
   const dr = document.getElementById('drafts');
   if (dr) dr.innerHTML = diaries.filter(d => d.status === 'draft').map(d => `<div class="row card" style="margin:.4rem 0"><span style="flex:1">${esc(d.title)}（草稿）</span><button data-edit="${d.id}">繼續編輯</button></div>`).join('');
   dr?.querySelectorAll('[data-edit]').forEach(b => b.onclick = async () => editor(await get('diary', b.dataset.edit)));
@@ -82,6 +89,8 @@ export async function renderDiary() {
 async function renderEntry(id) {
   const d = await get('diary', id);
   if (!d) return document.getElementById('app').innerHTML = '<div class="empty">找不到日記</div>';
+  if (!canView(d)) return privateNotice();
+  if (isLocked(d)) return lockNotice(d);
   document.getElementById('app').innerHTML = `
     <a href="#/diary">← 日記列表</a>
     <article class="card" style="margin-top:1rem">

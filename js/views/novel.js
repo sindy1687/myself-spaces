@@ -1,9 +1,10 @@
 // 小說：列表、匯入精靈（編碼+章節預覽編輯）、詳情、閱讀器
-import { list, get, save, trash, getProgress, saveProgress, listCategories } from '../store.js';
-import { splitChapters, decodeText, guessNovelTitle, parseNovelMeta } from '../chapters.js';
-import { esc, uid, modal, toast, confirmDialog, debounce, fmtDate, attachUploadBtn } from '../util.js';
+import { list, get, save, trash, getProgress, saveProgress, listCategories, canView, isLocked, TYPES } from '../store.js';
+import { splitChapters, decodeText, guessNovelTitle, parseNovelMeta, splitVolume, volumeLabel, volumeRank, compareTitle, VOLUME_WORDS } from '../chapters.js';
+import { esc, uid, modal, toast, confirmDialog, debounce, fmtDate, attachUploadBtn, attachGalleryBtn, isFid, hydrateMedia, initialOf, privateNotice, lockNotice, lockBadge } from '../util.js';
 import { db } from '../db.js';
 import { isAuthed } from '../auth.js';
+import { selectMode } from '../select-mode.js';
 import { setNav } from './home.js';
 
 // 觀看次數（同一工作階段不重複計）
@@ -12,8 +13,24 @@ export async function countView(type, id) {
   if (sessionStorage.getItem(key)) return;
   sessionStorage.setItem(key, '1');
   const it = await get(type, id);
-  if (it) await save(type, { ...it, views: (it.views || 0) + 1 });
+  // 觀看次數只記在本機，不算「作品有修改」（不改更新時間、不觸發同步）
+  if (it) await db.putRaw(TYPES[type], { ...it, views: (it.views || 0) + 1 });
 }
+
+// 封面可為網址/data URL，或畫廊圖片的 fileId（由 hydrateMedia 補上 src）
+const coverSrc = cv => isFid(cv) ? `data-fid="${esc(cv)}"` : `src="${esc(cv)}"`;
+
+// 卷數：封面角落的書籤標示、標題旁的小標籤、純文字標題、編輯用下拉選單
+const VOL_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4.5L6 21z" fill="currentColor"/></svg>';
+export const volBadge = n => n.volume !== '' && n.volume != null ? `<span class="vol-badge" title="${esc(volumeLabel(n.volume))}">${VOL_ICON}${esc(volumeLabel(n.volume))}</span>` : '';
+const volPill = n => n.volume !== '' && n.volume != null ? `<span class="vol-pill">${VOL_ICON}${esc(volumeLabel(n.volume))}</span>` : '';
+export const fullTitle = n => n.title + (n.volume !== '' && n.volume != null ? ' ' + volumeLabel(n.volume) : '');
+function volSelect(id, cur, attrs = '') {
+  const opts = ['', ...Array.from({ length: 30 }, (_, i) => i + 1), ...VOLUME_WORDS];
+  if (cur !== '' && cur != null && !opts.some(o => String(o) === String(cur))) opts.push(cur);
+  return `<select ${id ? `id="${id}"` : ''} ${attrs}>${opts.map(o => `<option value="${esc(o)}" ${String(o) === String(cur ?? '') ? 'selected' : ''}>${o === '' ? '（不分卷）' : esc(volumeLabel(o))}</option>`).join('')}</select>`;
+}
+const readVol = v => /^\d+$/.test(v) ? +v : v;
 
 function statusBadge(s) {
   if (!s) return '';
@@ -25,25 +42,229 @@ export async function renderNovels() {
   const novels = await list('novel');
   const { getSettings } = await import('../store.js');
   const defCover = (await getSettings()).defaultNovelCover || '';
-  const catId = new URLSearchParams(location.hash.split('?')[1] || '').get('cat');
+  const qs = new URLSearchParams(location.hash.split('?')[1] || '');
+  const catId = qs.get('cat'), series = qs.get('series'), kind = qs.get('kind') || '';
   sessionStorage.setItem('lastType', 'novel');
   if (catId) sessionStorage.setItem('cat:novel', catId);
   const cats = await listCategories('novel');
-  const shown = catId === 'uncategorized' ? novels.filter(n => !(n.categoryIds || []).length && !n.categoryId)
+  const authed = isAuthed();
+  const inCat = catId === 'uncategorized' ? novels.filter(n => !(n.categoryIds || []).length && !n.categoryId)
     : catId ? novels.filter(n => (n.categoryIds || []).includes(catId) || n.categoryId === catId) : novels;
-  document.getElementById('app').innerHTML = `
-    <div class="row"><h1 style="margin-right:auto">小說庫</h1>${isAuthed() ? `<a class="primary" href="#/novels/import${catId && catId !== 'uncategorized' ? '?cat=' + catId : ''}"><button class="primary">＋ 匯入小說</button></a>` : ''}</div>
-    ${catChips(cats, 'novel', '#/novels', catId)}
-    ${shown.length ? `<div class="grid">${shown.map(n => `
-      <a class="card" href="#/novel/${n.id}" style="color:var(--text)">
-        ${n.cover || defCover ? `<img class="cover" src="${esc(n.cover || defCover)}" alt="${esc(n.title)}封面">` : `<div class="cover" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:2rem">${esc(n.title[0])}</div>`}
-        <h3>${esc(n.title)} ${n.demo ? '<span class="tag">示範</span>' : ''}</h3>
+
+  const novelCard = n => `
+      <a class="card" href="#/novel/${n.id}" data-sel="n:${n.id}" style="color:var(--text);position:relative">${volBadge(n)}
+        ${n.cover || defCover ? `<img class="cover" ${coverSrc(n.cover || defCover)} alt="${esc(fullTitle(n))}封面">` : `<div class="cover" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:2rem">${esc(initialOf(n.title))}</div>`}
+        <h3>${esc(n.title)}${lockBadge(n)} ${n.demo ? '<span class="tag">示範</span>' : ''}</h3>
         <div>${statusBadge(n.status)} <span class="muted">${esc(n.author || '')} ・ ${(n.chapters || []).length} 章</span></div>
         <div>${(n.tags || []).map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
-      </a>`).join('')}</div>` : '<div class="empty">尚未匯入小說</div>'}
+      </a>`;
+  const app = document.getElementById('app');
+
+  // 叢書頁：該套各卷依卷數由左而右排
+  if (series) {
+    const vols = seriesMembers(novels, series);
+    const chTotal = vols.reduce((k, n) => k + (n.chapters || []).length, 0);
+    app.innerHTML = `
+      <p><a href="#/novels">← 小說庫</a></p>
+      <div class="row"><h1 style="margin-right:auto">📚 ${esc(series)} <span class="series-tag">叢書</span></h1>
+        ${authed ? '<button id="sel-btn">☑ 選取</button><button id="sr-sort">↕ 排序各卷</button><button id="sr-edit">編輯叢書</button><button id="sr-break" class="danger">解散叢書</button>' : ''}</div>
+      <p class="muted">共 ${vols.length} 卷 ・ ${chTotal} 章${vols[0]?.author ? ' ・ ' + esc(vols[0].author) : ''}</p>
+      ${vols.length ? `<div class="grid">${vols.map(novelCard).join('')}</div>` : '<div class="empty">這套叢書還沒有小說</div>'}`;
+    setNav();
+    hydrateMedia(app);
+    document.getElementById('sr-edit')?.addEventListener('click', () => manageSeries(novels, series));
+    novelSelect(app, novels);
+    document.getElementById('sr-sort')?.addEventListener('click', () => sortDialog(`排序「${series}」各卷`, '排好後會依序重新編成第一卷、第二卷、第三卷…，由左而右顯示。',
+      vols.map(n => ({ key: n.id, label: n.title + (n.volume !== '' && n.volume != null ? '（' + volumeLabel(n.volume) + '）' : ''), img: n.cover || defCover })),
+      async ids => { for (const [k, id] of ids.entries()) { const n = vols.find(v => v.id === id); await db.put('novels', { ...n, volume: k + 1 }); } toast('已重新排序並編好卷數', 'success'); renderNovels(); }));
+    document.getElementById('sr-break')?.addEventListener('click', async () => {
+      if (!await confirmDialog(`解散叢書「${series}」？裡面的 ${vols.length} 本會變回單本（小說本身不會刪除，卷數保留）。`, { danger: true, okText: '解散' })) return;
+      for (const n of vols) await db.put('novels', { ...n, series: '' });
+      toast('已解散叢書', 'success'); location.hash = '#/novels';
+    });
+    return;
+  }
+
+  // 小說庫：叢書合成一張「整套」卡片，單本照常顯示
+  const items = [], seen = new Set();
+  for (const n of inCat) {
+    if (n.series) {
+      if (kind === 'single' || seen.has(n.series)) continue;
+      seen.add(n.series);
+      items.push({ series: n.series, vols: seriesMembers(novels, n.series) });
+    } else if (kind !== 'series') items.push({ n });
+  }
+  // 自訂順序（shelfOrder）優先，沒排過的照名稱接在後面
+  const ordOf = it => it.n ? it.n.shelfOrder ?? Infinity : Math.min(...it.vols.map(v => v.shelfOrder ?? Infinity));
+  items.forEach((it, k) => { it.k = k; });
+  items.sort((a, b) => (ordOf(a) - ordOf(b)) || a.k - b.k);
+  const seriesCard = ({ series: name, vols }) => {
+    const first = vols.find(v => v.cover) || vols[0], cv = first?.cover || defCover;
+    return `
+      <a class="card series-card" href="#/novels?series=${encodeURIComponent(name)}" data-sel="s:${esc(name)}" style="color:var(--text)">
+        <div class="series-stack">${cv ? `<img class="cover" ${coverSrc(cv)} alt="${esc(name)}封面">` : `<div class="cover" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:2rem">${esc(initialOf(name))}</div>`}
+          <span class="series-count">📚 ${vols.length} 卷</span></div>
+        <h3>${esc(name)} <span class="series-tag">叢書</span></h3>
+        <div class="muted">${esc(vols[0]?.author || '')}${vols[0]?.author ? ' ・ ' : ''}${vols.map(v => esc(volumeLabel(v.volume) || v.title)).slice(0, 3).join('、')}${vols.length > 3 ? '…' : ''}</div>
+      </a>`;
+  };
+  const kindChip = (v, label) => `<a class="album-chip ${kind === v ? 'on' : ''}" href="#/novels?${new URLSearchParams({ ...(catId ? { cat: catId } : {}), ...(v ? { kind: v } : {}) })}">${label}</a>`;
+  app.innerHTML = `
+    <div class="row"><h1 style="margin-right:auto">小說庫</h1>${authed ? `<button id="sel-btn">☑ 選取</button><button id="shelf-sort">↕ 排序</button><button id="sr-new">📚 建立叢書</button><button id="vol-fix" title="把書名裡的「第幾卷」搬到卷數欄位，讓同一套書依 1、2、3 排序">🔖 整理卷數</button><a class="primary" href="#/novels/import${catId && catId !== 'uncategorized' ? '?cat=' + catId : ''}"><button class="primary">＋ 匯入小說</button></a>` : ''}</div>
+    <div class="row" style="gap:.4rem;margin:.4rem 0">${kindChip('', '全部')}${kindChip('series', '📚 叢書')}${kindChip('single', '📕 單本')}</div>
+    ${catChips(cats, 'novel', '#/novels', catId)}
+    ${items.length ? `<div class="grid">${items.map(it => it.n ? novelCard(it.n) : seriesCard(it)).join('')}</div>`
+      : `<div class="empty">${kind === 'series' ? '還沒有叢書，按「📚 建立叢書」把同一套的各卷收在一起' : kind === 'single' ? '沒有單本小說' : '尚未匯入小說'}</div>`}
   `;
   setNav();
   bindCatChips('novel', renderNovels);
+  document.getElementById('vol-fix')?.addEventListener('click', () => fixVolumes(novels));
+  novelSelect(app, novels);
+  document.getElementById('sr-new')?.addEventListener('click', () => manageSeries(novels, ''));
+  document.getElementById('shelf-sort')?.addEventListener('click', () => {
+    // 對整個書架排序（不受目前篩選影響）
+    const all = [], seen2 = new Set();
+    for (const n of novels) {
+      if (!n.series) all.push({ key: 'n:' + n.id, label: fullTitle(n), img: n.cover || defCover, ord: n.shelfOrder ?? Infinity });
+      else if (!seen2.has(n.series)) { seen2.add(n.series); const vs = seriesMembers(novels, n.series); all.push({ key: 's:' + n.series, label: `📚 ${n.series}（叢書・${vs.length} 卷）`, img: (vs.find(v => v.cover) || vs[0]).cover || defCover, ord: Math.min(...vs.map(v => v.shelfOrder ?? Infinity)) }); }
+    }
+    all.forEach((x, k) => { x.k = k; });
+    all.sort((a, b) => (a.ord - b.ord) || a.k - b.k);
+    sortDialog('排序小說庫', '拖曳或用 ↑ ↓ 調整，小說庫會由左而右、由上而下照這個順序顯示。', all, async keys => {
+      for (const [k, key] of keys.entries()) {
+        const targets = key.startsWith('s:') ? novels.filter(n => n.series === key.slice(2)) : novels.filter(n => 'n:' + n.id === key);
+        for (const n of targets) await db.put('novels', { ...n, shelfOrder: k });
+      }
+      toast('已儲存順序', 'success'); renderNovels();
+    }, async () => {
+      for (const n of novels) if (n.shelfOrder != null) { const { shelfOrder, ...rest } = n; await db.put('novels', rest); }
+      toast('已恢復依名稱排序', 'success'); renderNovels();
+    });
+  });
+}
+
+// 通用排序視窗：拖曳或 ↑ ↓ 調整，回傳 key 陣列；onReset 有給時多一顆「恢復依名稱排序」
+export function sortDialog(title, hint, entries, onSave, onReset) {
+  let arr = [...entries];
+  modal(`<h3>${esc(title)}</h3><p class="muted" style="margin:0 0 .6rem">${esc(hint)}</p>
+    <div id="sd-list" class="sort-list"></div>
+    <div class="row" style="justify-content:flex-end;margin-top:1rem">${onReset ? '<button id="sd-reset" style="margin-right:auto">恢復依名稱排序</button>' : ''}<button data-close>取消</button><button id="sd-ok" class="primary">儲存順序</button></div>`, {
+    onOpen(bg, close) {
+      const box = bg.querySelector('#sd-list');
+      const draw = () => {
+        box.innerHTML = arr.map((e, i) => `<div class="sort-item" draggable="true" data-i="${i}"><span class="sort-no">${i + 1}</span>
+          ${e.img ? `<img ${coverSrc(e.img)} alt="">` : '<span class="sort-noimg">📕</span>'}<span class="sort-label">${esc(e.label)}</span>
+          <button type="button" data-mv="-1" ${i ? '' : 'disabled'} aria-label="上移">↑</button><button type="button" data-mv="1" ${i < arr.length - 1 ? '' : 'disabled'} aria-label="下移">↓</button></div>`).join('');
+        hydrateMedia(box);
+      };
+      draw();
+      box.onclick = e => {
+        const b = e.target.closest('[data-mv]'); if (!b) return;
+        const i = +b.closest('[data-i]').dataset.i, j = i + +b.dataset.mv;
+        [arr[i], arr[j]] = [arr[j], arr[i]]; draw();
+      };
+      let from = null;
+      box.addEventListener('dragstart', e => { from = +e.target.closest('[data-i]')?.dataset.i; e.target.classList?.add('dragging'); });
+      box.addEventListener('dragend', () => { from = null; box.querySelectorAll('.dragging').forEach(x => x.classList.remove('dragging')); });
+      box.addEventListener('dragover', e => e.preventDefault());
+      box.addEventListener('drop', e => {
+        e.preventDefault();
+        const to = +e.target.closest('[data-i]')?.dataset.i;
+        if (from == null || Number.isNaN(to) || to === from) return;
+        const [m] = arr.splice(from, 1); arr.splice(to, 0, m); draw();
+      });
+      bg.querySelector('#sd-ok').onclick = async () => { close(); await onSave(arr.map(e => e.key)); };
+      bg.querySelector('#sd-reset')?.addEventListener('click', async () => { close(); await onReset(); });
+    }
+  });
+}
+
+// 小說庫複選：單本 n:id、整套叢書 s:名稱（刪除叢書＝刪除裡面每一卷）
+function novelSelect(app, novels) {
+  const ids = keys => [...new Set(keys.flatMap(k => k.startsWith('s:') ? novels.filter(n => n.series === k.slice(2)).map(n => n.id) : [k.slice(2)]))];
+  selectMode({
+    button: document.getElementById('sel-btn'), root: app.querySelector('.grid') || app, actions: [
+      { label: '🗑 刪除', danger: true, confirm: n => `把選取的項目移到回收筒？（選到叢書會刪除整套的每一卷；可在「管理 → 回收筒」還原）`,
+        run: async keys => { const list2 = ids(keys); for (const id of list2) await trash('novel', id); toast(`已刪除 ${list2.length} 本`, 'success'); renderNovels(); } },
+    ],
+  });
+}
+
+// 叢書成員：依卷數（第一卷、第二卷…）再依書名排
+function seriesMembers(novels, name) {
+  return novels.filter(n => n.series === name).sort((a, b) => volumeRank(a.volume) - volumeRank(b.volume) || compareTitle(a.title, b.title));
+}
+const seriesNames = novels => [...new Set(novels.map(n => n.series).filter(Boolean))].sort(compareTitle);
+
+// 建立／編輯叢書：取名、勾選成員、設定各卷卷數；改名會一起套用到所有成員
+function manageSeries(novels, name) {
+  const rows = [...novels].sort((a, b) => (b.series === name && name ? 1 : 0) - (a.series === name && name ? 1 : 0));
+  modal(`<h3>${name ? `編輯叢書「${esc(name)}」` : '建立叢書'}</h3>
+    <label>叢書名稱</label><div class="field-inline"><input id="sr-name" value="${esc(name)}" placeholder="例如：星海" list="sr-names"><button type="button" id="sr-auto">勾選同名小說</button></div>
+    <datalist id="sr-names">${seriesNames(novels).map(s => `<option value="${esc(s)}">`).join('')}</datalist>
+    <p class="muted" style="margin:.4rem 0">勾選要放進這套叢書的小說，並設定各自是第幾卷。</p>
+    <div style="max-height:50vh;overflow:auto"><table>
+      <tr><th></th><th>小說</th><th>卷數</th><th></th></tr>
+      ${rows.map(n => `<tr data-id="${n.id}"><td><input type="checkbox" ${name && n.series === name ? 'checked' : ''} style="width:auto"></td>
+        <td>${esc(n.title)}</td><td>${volSelect('', n.volume, `data-vol="${n.id}"`)}</td>
+        <td class="muted" style="font-size:.85em">${n.series && n.series !== name ? `目前在《${esc(n.series)}》` : ''}</td></tr>`).join('')}
+    </table></div>
+    <div class="row" style="justify-content:flex-end;margin-top:1rem"><button data-close>取消</button><button id="sr-ok" class="primary">儲存</button></div>`, {
+    onOpen(bg, close) {
+      // 依書名自動勾選：書名（去掉卷數）等於叢書名稱，並順便帶入卷數
+      bg.querySelector('#sr-auto').onclick = () => {
+        const nm = bg.querySelector('#sr-name').value.trim(); if (!nm) return toast('請先輸入叢書名稱', 'error');
+        let k = 0;
+        for (const n of novels) {
+          const sp = splitVolume(n.title);
+          if (sp.title !== nm && n.title !== nm) continue;
+          const tr = bg.querySelector(`tr[data-id="${n.id}"]`);
+          tr.querySelector('input[type=checkbox]').checked = true; k++;
+          const sel = tr.querySelector('select');
+          if (sp.volume !== '' && !sel.value) { if (![...sel.options].some(o => o.value === String(sp.volume))) sel.add(new Option(volumeLabel(sp.volume), sp.volume)); sel.value = String(sp.volume); }
+        }
+        toast(k ? `已勾選 ${k} 本` : '沒有找到同名小說', k ? 'success' : 'error');
+      };
+      bg.querySelector('#sr-ok').onclick = async () => {
+        const nm = bg.querySelector('#sr-name').value.trim();
+        if (!nm) return toast('請輸入叢書名稱', 'error');
+        if (!bg.querySelector('tr[data-id] input[type=checkbox]:checked')) return toast('請至少勾選一本小說', 'error');
+        let k = 0;
+        for (const n of novels) {
+          const tr = bg.querySelector(`tr[data-id="${n.id}"]`);
+          const on = tr.querySelector('input[type=checkbox]').checked, vol = readVol(tr.querySelector('select').value);
+          const next = on ? { series: nm, volume: vol } : n.series === name && name ? { series: '' } : null;
+          if (!next) { if (String(vol) !== String(n.volume ?? '')) await db.put('novels', { ...n, volume: vol }); continue; }
+          await db.put('novels', { ...n, ...next }); if (on) k++;
+        }
+        close(); toast(`叢書「${nm}」已儲存（${k} 本）`, 'success');
+        location.hash = `#/novels?series=${encodeURIComponent(nm)}`;
+      };
+    }
+  });
+}
+// 一次整理：書名寫了「第幾卷」但還沒設卷數的小說 → 預覽勾選後搬到卷數欄位
+function fixVolumes(novels) {
+  const todo = novels.filter(n => n.volume === '' || n.volume == null)
+    .map(n => ({ n, ...splitVolume(n.title) })).filter(x => x.volume !== '');
+  if (!todo.length) return toast('沒有需要整理的小說：書名裡都沒有「第幾卷」，或已經設好卷數了', 'success');
+  modal(`<h3>整理卷數（${todo.length} 本）</h3>
+    <p class="muted">把書名裡的卷數搬到「卷數」欄位，之後同一套書會依 1、2、3 排序。取消勾選的不會改。</p>
+    <div style="max-height:50vh;overflow:auto"><table><tr><th></th><th>原本書名</th><th>改成</th><th>卷數</th></tr>
+      ${todo.map((x, i) => `<tr><td><input type="checkbox" data-i="${i}" checked style="width:auto"></td><td>${esc(x.n.title)}</td><td>${esc(x.title)}</td><td><span class="vol-pill" style="font-size:.85em">${esc(volumeLabel(x.volume))}</span></td></tr>`).join('')}
+    </table></div>
+    <label><input type="checkbox" id="vf-series" checked style="width:auto"> 同時建立叢書：同名的各卷收成一套（例如「星海」第一卷～第三卷）</label>
+    <div class="row" style="justify-content:flex-end;margin-top:1rem"><button data-close>取消</button><button id="vf-ok" class="primary">套用</button></div>`, {
+    onOpen(bg, close) {
+      bg.querySelector('#vf-ok').onclick = async () => {
+        const picked = [...bg.querySelectorAll('input[data-i]:checked')].map(c => todo[+c.dataset.i]);
+        // 直接寫入、保留原本的更新時間，避免首頁「最近更新」被洗版
+        const mkSeries = bg.querySelector('#vf-series').checked;
+        for (const x of picked) await db.put('novels', { ...x.n, title: x.title, volume: x.volume, ...(mkSeries && !x.n.series ? { series: x.title } : {}) });
+        close(); toast(`已整理 ${picked.length} 本`, 'success'); renderNovels();
+      };
+    }
+  });
 }
 
 // 小說簡介排版：TXT 匯入的文案常把段落擠成一行（以全形空白分隔），這裡拆回段落，
@@ -213,13 +434,16 @@ export function renderNovelImport() {
   function showPreview(chapters, title, totalLen, meta = {}) {
     const pv = document.getElementById('preview');
     if (!chapters.length) chapters = [{ title: '全文', content: '' }];
+    const sv = splitVolume(meta.title || title);
     pv.innerHTML = `
       <h2 class="section-title">章節預覽（共 ${chapters.length} 章・${totalLen} 字）</h2>
       <div class="card">
-        <label>小說名稱</label><input id="n-title" value="${esc(meta.title || title)}">
+        <div class="row"><div style="flex:3"><label>小說名稱</label><input id="n-title" value="${esc(sv.title)}"></div>
+          <div style="flex:1;min-width:8em"><label>卷數</label>${volSelect('n-vol', sv.volume)}</div></div>
+        ${sv.volume !== '' ? '<p class="muted" style="margin:.2rem 0">已從書名取出卷數，書名不用再寫「第幾卷」。</p>' : ''}
         <label>作者</label><input id="n-author" value="${esc(meta.author || '')}">
         <label>簡介 / 大綱</label><textarea id="n-desc" rows="3">${esc(meta.desc || '')}</textarea>
-        <label>封面圖片</label><div class="field-inline"><input id="n-cover" placeholder="貼上圖片網址，或上傳"><button id="n-cover-up" type="button">上傳</button></div>
+        <label>封面圖片</label><div class="field-inline"><input id="n-cover" placeholder="貼上圖片網址、上傳，或從相簿選"><button id="n-cover-up" type="button">上傳</button><button id="n-cover-gal" type="button">🖼 從相簿選</button></div>
         <div id="ch-list" style="margin-top:.8rem"></div>
         <div class="row" style="margin-top:.8rem">
           <button id="add-ch">＋ 新增章節</button>
@@ -266,6 +490,7 @@ export function renderNovelImport() {
       const [m] = chs.splice(dragI, 1); chs.splice(i, 0, m); draw();
     });
     attachUploadBtn(document.getElementById('n-cover-up'), document.getElementById('n-cover'));
+    attachGalleryBtn(document.getElementById('n-cover-gal'), document.getElementById('n-cover'));
     document.getElementById('add-ch').onclick = () => { chs.push({ id: uid(), title: `第 ${chs.length + 1} 章`, content: '' }); draw(); };
     const conv = async dir => {
       const { convert } = await import('../zhconv.js');
@@ -280,7 +505,7 @@ export function renderNovelImport() {
       const t = document.getElementById('n-title').value.trim();
       if (!t) return toast('請輸入小說名稱', 'error');
       if (!chs.length) return toast('至少要有一章', 'error');
-      const n = await save('novel', { title: t, author: document.getElementById('n-author').value.trim(), desc: document.getElementById('n-desc').value.trim(), cover: document.getElementById('n-cover').value.trim(), chapters: chs, status: '連載中', tags: [], categoryIds: preCat ? [preCat] : [] });
+      const n = await save('novel', { title: t, volume: readVol(document.getElementById('n-vol').value), author: document.getElementById('n-author').value.trim(), desc: document.getElementById('n-desc').value.trim(), cover: document.getElementById('n-cover').value.trim(), chapters: chs, status: '連載中', tags: [], categoryIds: preCat ? [preCat] : [] });
       toast('匯入成功', 'success');
       location.hash = `#/novel/${n.id}`;
     };
@@ -292,6 +517,8 @@ export function renderNovelImport() {
 export async function renderNovelDetail(id) {
   const n = await get('novel', id);
   if (!n) return document.getElementById('app').innerHTML = '<div class="empty">找不到這部小說</div>';
+  if (!canView(n)) return privateNotice();
+  if (isLocked(n)) return lockNotice(n);
   const prog = await getProgress(id);
   const bmSet = new Set((prog?.bookmarks || []).map(b => b.chapterId));
   const cats = await listCategories('novel');
@@ -299,12 +526,17 @@ export async function renderNovelDetail(id) {
   const defCover = (await getSettings()).defaultNovelCover || '';
   const chs = n.chapters || [];
   const TOC_LIMIT = 12;
+  const sib = n.series ? seriesMembers(await list('novel'), n.series) : [];
+  const si = sib.findIndex(x => x.id === n.id);
   const app = document.getElementById('app');
   app.innerHTML = `
     <div class="card" style="display:flex;gap:1.5rem;flex-wrap:wrap">
-      ${n.cover || defCover ? `<img src="${esc(n.cover || defCover)}" style="width:180px;border-radius:var(--radius)" alt="封面">` : ''}
+      ${n.cover || defCover ? `<div style="position:relative;align-self:flex-start">${volBadge(n)}<img ${coverSrc(n.cover || defCover)} style="width:180px;border-radius:var(--radius);display:block" alt="封面"></div>` : ''}
       <div style="flex:1;min-width:240px">
-        <h1 style="margin-top:0">${esc(n.title)} ${n.demo ? '<span class="tag">示範</span>' : ''}</h1>
+        <h1 style="margin-top:0">${esc(n.title)} ${volPill(n)} ${n.demo ? '<span class="tag">示範</span>' : ''}</h1>
+        ${sib.length ? `<p class="series-line">📚 叢書<a href="#/novels?series=${encodeURIComponent(n.series)}">《${esc(n.series)}》</a>第 ${si + 1} / ${sib.length} 本
+          ${sib[si - 1] ? `<a href="#/novel/${sib[si - 1].id}"><button>← ${esc(volumeLabel(sib[si - 1].volume) || '上一本')}</button></a>` : ''}
+          ${sib[si + 1] ? `<a href="#/novel/${sib[si + 1].id}"><button>${esc(volumeLabel(sib[si + 1].volume) || '下一本')} →</button></a>` : ''}</p>` : ''}
         <p>${statusBadge(n.status)} <span class="muted">${esc(n.author || '佚名')} ・ ${(n.chapters || []).length} 章 ・ 更新於 ${fmtDate(n.updatedAt)}</span></p>
         ${formatDesc(n.desc, n)}
         <div>${(n.tags || []).map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
@@ -326,6 +558,7 @@ export async function renderNovelDetail(id) {
     ${(prog?.bookmarks || []).length ? `<h2 class="section-title">書籤清單</h2>
     <div class="card">${prog.bookmarks.map((b, bi) => `<div class="chapter-item"><span class="bm-mark">🔖</span><a href="#/read/${id}/${b.chapterId}${b.pIdx != null ? '?p=' + b.pIdx : ''}" style="flex:1;color:var(--text)">${esc(b.title)}${b.snippet ? ` <span class="muted">${esc(b.snippet)}…</span>` : ''}</a><span class="muted">${fmtDate(b.at)}</span><button class="bm-del" data-b="${bi}" title="刪除書籤">✕</button></div>`).join('')}</div>` : ''}`;
 
+  hydrateMedia(app);
   countView('novel', id);
   // 章節很多時：預設只顯示前幾章（讀到的那章永遠顯示），可搜尋或一鍵展開
   const tocList = document.getElementById('toc-list');
@@ -481,14 +714,22 @@ function pasteChapters(current, apply) {
 }
 
 function editMeta(n, cats) {
+  // 尚未設卷數、但書名寫了「第幾卷」→ 自動帶入
+  const hasVol = n.volume !== '' && n.volume != null;
+  const sp = hasVol ? null : splitVolume(n.title);
+  const mv = sp?.volume !== '' && sp ? { title: sp.title, volume: sp.volume, fromTitle: true } : { title: n.title, volume: hasVol ? n.volume : '' };
   modal(`
     <h3>編輯小說資料</h3>
-    <label>名稱</label><input id="m-title" value="${esc(n.title)}">
+    <div class="row"><div style="flex:3"><label>名稱</label><input id="m-title" value="${esc(mv.title)}"></div>
+      <div style="flex:1;min-width:8em"><label>卷數</label>${volSelect('m-vol', mv.volume)}</div></div>
+    ${mv.fromTitle ? '<p class="muted" style="margin:.2rem 0;color:var(--primary)">已從書名取出卷數並去掉書名裡的「第幾卷」，按儲存後生效。</p>' : ''}
+    <label>形式</label><div class="row" style="gap:1rem"><label style="margin:0"><input type="radio" name="m-kind" value="single" ${n.series ? '' : 'checked'} style="width:auto"> 📕 單本</label><label style="margin:0"><input type="radio" name="m-kind" value="series" ${n.series ? 'checked' : ''} style="width:auto"> 📚 叢書的其中一卷</label></div>
+    <div id="m-series-row" class="${n.series ? '' : 'hidden'}"><label>叢書名稱</label><input id="m-series" list="m-series-list" value="${esc(n.series || '')}" placeholder="同一套書填一樣的名稱"><datalist id="m-series-list"></datalist></div>
     <label>作者</label><input id="m-author" value="${esc(n.author || '')}">
     <label>簡介</label><textarea id="m-desc" rows="3">${esc(n.desc || '')}</textarea>
-    <label>封面圖片</label><div class="field-inline"><input id="m-cover" value="${esc(n.cover || '')}" placeholder="網址或上傳"><button id="m-cover-up" type="button">上傳</button><button id="m-cover-find" type="button">🔍 搜尋</button></div>
+    <label>封面圖片</label><div class="field-inline"><input id="m-cover" value="${esc(n.cover || '')}" placeholder="網址、上傳或從相簿選"><button id="m-cover-up" type="button">上傳</button><button id="m-cover-gal" type="button">🖼 從相簿選</button><button id="m-cover-find" type="button">🔍 搜尋</button></div>
     <div id="cover-hits" class="row" style="margin:.4rem 0"></div>
-    <div id="cover-prev" style="margin:.4rem 0">${n.cover ? `<img src="${esc(n.cover)}" style="height:120px;border-radius:6px">` : ''}</div>
+    <div id="cover-prev" style="margin:.4rem 0">${n.cover ? `<img ${coverSrc(n.cover)} style="height:120px;border-radius:6px">` : ''}</div>
     <label>連載狀態</label><select id="m-status">${['連載中', '已完結', '暫停'].map(s => `<option ${n.status === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
     <label>分類（可複選、可搜尋）</label>
     <input id="m-cat-q" placeholder="搜尋分類…">
@@ -505,7 +746,16 @@ function editMeta(n, cats) {
     <div class="row" style="justify-content:flex-end;margin-top:1rem"><button data-close>取消</button><button id="m-save" class="primary">儲存</button></div>`,
     {
       async onOpen(bg, close) {
+        // 單本／叢書切換；叢書名稱有既有叢書可選
+        bg.querySelectorAll('[name=m-kind]').forEach(r => r.onchange = () => {
+          const on = bg.querySelector('[name=m-kind]:checked').value === 'series';
+          bg.querySelector('#m-series-row').classList.toggle('hidden', !on);
+          if (on && !bg.querySelector('#m-series').value) bg.querySelector('#m-series').value = bg.querySelector('#m-title').value.trim();
+        });
+        list('novel').then(all => { bg.querySelector('#m-series-list').innerHTML = seriesNames(all).map(x => `<option value="${esc(x)}">`).join(''); });
         attachUploadBtn(bg.querySelector('#m-cover-up'), bg.querySelector('#m-cover'));
+        attachGalleryBtn(bg.querySelector('#m-cover-gal'), bg.querySelector('#m-cover'));
+        hydrateMedia(bg.querySelector('#cover-prev'));
         // 分類搜尋篩選
         bg.querySelector('#m-cat-q').oninput = e => {
           const k = e.target.value.trim();
@@ -546,7 +796,8 @@ function editMeta(n, cats) {
         const { tagStats } = await import('../store.js');
         bg.querySelector('#tag-suggest').innerHTML = (await tagStats()).map(([t]) => `<option value="${esc(t)}">`).join('');
         bg.querySelector('#m-cover').addEventListener('input', e => {
-          bg.querySelector('#cover-prev').innerHTML = e.target.value ? `<img src="${esc(e.target.value)}" style="height:120px;border-radius:6px" onerror="this.outerHTML='<span class=muted>圖片載入失敗</span>'">` : '';
+          bg.querySelector('#cover-prev').innerHTML = e.target.value ? `<img ${coverSrc(e.target.value)} style="height:120px;border-radius:6px" onerror="this.outerHTML='<span class=muted>圖片載入失敗</span>'">` : '';
+          hydrateMedia(bg.querySelector('#cover-prev'));
         });
         bg.querySelector('#m-cover-find').onclick = async e => {
           e.preventDefault();
@@ -571,7 +822,8 @@ function editMeta(n, cats) {
         };
         bg.querySelector('#m-save').onclick = async () => {
           await save('novel', {
-            ...n, title: bg.querySelector('#m-title').value, author: bg.querySelector('#m-author').value,
+            ...n, title: bg.querySelector('#m-title').value, volume: readVol(bg.querySelector('#m-vol').value),
+            series: bg.querySelector('[name=m-kind]:checked').value === 'series' ? (bg.querySelector('#m-series').value.trim() || bg.querySelector('#m-title').value.trim()) : '', author: bg.querySelector('#m-author').value,
             desc: bg.querySelector('#m-desc').value, cover: bg.querySelector('#m-cover').value,
             status: bg.querySelector('#m-status').value,
             categoryIds: [...bg.querySelectorAll('#m-cat-list input:checked')].map(i => i.value).filter(x => validIds.has(x)),
@@ -587,7 +839,7 @@ function editMeta(n, cats) {
 }
 
 export function shareDialog(item) {
-  const type = item.chapters ? 'novel' : item.content ? 'diary' : 'image';
+  const type = item.pages ? 'book' : item.chapters ? 'novel' : item.content ? 'diary' : 'image';
   modal(`
     <h3>分享「${esc(item.title)}」</h3>
     <p class="muted">公開分享需要分享伺服器（見 README 的 server/）。分享連結與「同步到 Google Drive」無關，同步不會公開你的資料。</p>
@@ -609,8 +861,17 @@ export function shareDialog(item) {
             const { token } = await r.json();
             const url = `${location.origin}/#/share/${token}`;
             out.innerHTML = `<label>分享連結</label><div class="row"><input readonly value="${esc(url)}" id="sh-url"><button id="sh-copy">複製</button></div>
+              <div class="row" style="flex-wrap:wrap;gap:.3rem;margin:.5rem 0">
+                <a href="https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(url)}&text=${encodeURIComponent(item.title)}" target="_blank" rel="noopener"><button type="button" style="background:#06c755;color:#fff;border-color:#06c755">LINE</button></a>
+                <a href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}" target="_blank" rel="noopener"><button type="button">Facebook</button></a>
+                <a href="https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(item.title)}" target="_blank" rel="noopener"><button type="button">X</button></a>
+                <a href="mailto:?subject=${encodeURIComponent(item.title)}&body=${encodeURIComponent(url)}"><button type="button">Email</button></a>
+                ${navigator.share ? '<button type="button" id="sh-native">📤 其他 App…</button>' : ''}
+              </div>
+              ${/^(localhost|127\.|192\.168\.|10\.)/.test(location.hostname) ? '<p class="muted" style="color:#b3443c">目前是本機網址，別人點開會打不開；要分享給別人，請先把網站部署到公開網域（見 README「公開部署」）。</p>' : ''}
               <a href="${esc(url)}" target="_blank">預覽分享頁</a>`;
             bg.querySelector('#sh-copy').onclick = () => { navigator.clipboard.writeText(url); toast('已複製連結', 'success'); };
+            bg.querySelector('#sh-native')?.addEventListener('click', () => navigator.share({ title: item.title, text: item.title, url }).catch(() => {}));
           } catch {
             out.innerHTML = `<p class="muted">分享伺服器未啟動。請執行 <code>node server/share-server.js</code> 後再試。</p>`;
           }
@@ -634,6 +895,8 @@ function readerPrefs() { try { return JSON.parse(localStorage.getItem(RKEY)) || 
 export async function renderReader(novelId, chapterId) {
   const n = await get('novel', novelId);
   if (!n) return document.getElementById('app').innerHTML = '<div class="empty">找不到小說</div>';
+  if (!canView(n)) return privateNotice();
+  if (isLocked(n)) return lockNotice(n);
   const chs = n.chapters || [];
   let idx = chs.findIndex(c => c.id === chapterId);
   if (idx < 0) idx = 0;
@@ -647,7 +910,7 @@ export async function renderReader(novelId, chapterId) {
   app.innerHTML = `
     <div class="reader-bar">
       <button id="toc-btn" aria-label="目錄">☰ 目錄</button>
-      <a href="#/novel/${novelId}">← ${esc(n.title)}</a>
+      <a href="#/novel/${novelId}">← ${esc(fullTitle(n))}</a>
       <span style="margin-left:auto" class="muted">${idx + 1}/${chs.length}</span>
       <button id="font-dec" aria-label="字體縮小">A-</button>
       <button id="font-inc" aria-label="字體放大">A+</button>
@@ -656,6 +919,7 @@ export async function renderReader(novelId, chapterId) {
       <select id="rmode" aria-label="閱讀模式"><option value="light">亮色</option><option value="dark">深色</option><option value="green">護眼</option></select>
       <button id="bm" title="點一下段落選取，再按這裡把書籤存到該段">🔖 書籤</button>
       <button id="fs-btn">🔍 全文搜尋</button>
+      <button id="listen-btn" title="用語音朗讀這一章，讀完自動接下一章">🎧 聽書</button>
     </div>
     <div class="reader-wrap">
       <h1 style="font-size:1.5em">${esc(ch.title)}</h1>
@@ -692,7 +956,7 @@ export async function renderReader(novelId, chapterId) {
     const bmSet = new Set(bms.map(b => b.chapterId));
     const ov = document.createElement('div'); ov.className = 'overlay';
     const dr = document.createElement('nav'); dr.className = 'toc-drawer'; dr.setAttribute('aria-label', '章節目錄');
-    dr.innerHTML = `<h3>${esc(n.title)}</h3>${chs.length > 10 ? '<input id="toc-f" placeholder="搜尋章節…" style="margin-bottom:.4rem">' : ''}`
+    dr.innerHTML = `<h3>${esc(fullTitle(n))}</h3>${chs.length > 10 ? '<input id="toc-f" placeholder="搜尋章節…" style="margin-bottom:.4rem">' : ''}`
       + (bms.length ? `<div class="toc-bms"><h4 style="margin:.3rem 0 .1rem">書籤清單</h4>${bms.map(b => `<a href="#/read/${novelId}/${b.chapterId}${b.pIdx != null ? '?p=' + b.pIdx : ''}"><span class="bm-mark">🔖</span>${esc(b.title)}${b.snippet ? `<br><small class="muted">${esc(b.snippet)}…</small>` : ''}</a>`).join('')}</div>` : '')
       + chs.map((c, i) => `<a class="ch ${i === idx ? 'current' : ''}" data-t="${esc(c.title)}" href="#/read/${novelId}/${c.id}">${bmSet.has(c.id) ? '<span class="bm-mark" title="已加書籤">🔖</span>' : ''}${esc(c.title)}${c.id === p?.chapterId ? ' <span class="read-badge">讀到這裡</span>' : ''}</a>`).join('');
     ov.onclick = () => { ov.remove(); dr.remove(); };
@@ -735,6 +999,17 @@ export async function renderReader(novelId, chapterId) {
     syncBmParas(bms); refreshBmBtn();
   };
   refreshBmBtn();
+
+  // 聽書：從選取的段落（或畫面上第一段）開始；上一章聽完自動接到這一章
+  const listen = async (startAt, autoplay = true) => {
+    const { openListenBar } = await import('../listen.js');
+    openListenBar({ wrap, novelId, title: ch.title, paras, nextUrl: idx < chs.length - 1 ? `#/read/${novelId}/${chs[idx + 1].id}` : '', startAt, autoplay });
+  };
+  document.getElementById('listen-btn').onclick = async () => {
+    const { firstVisiblePara } = await import('../listen.js');
+    listen(selP ?? (scrollY < 120 ? -1 : firstVisiblePara(wrap)));
+  };
+  import('../listen.js').then(m => { if (m.takeContinue(novelId)) listen(-1); });
 
   // 全文搜尋
   document.getElementById('fs-btn').onclick = () => {

@@ -5,6 +5,47 @@ export const nowISO = () => new Date().toISOString();
 export const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // 是否為本機媒體檔 ID（非網址 / data: / blob:）
 export const isFid = s => !!s && /^[\w-]+$/.test(s);
+// 未登入時打開私人作品：顯示提示與登入按鈕，登入成功就重新顯示這一頁
+// 列表標題旁的鎖頭（作品有設定密碼時）
+export const lockBadge = it => (it?.lock?.hash ? ' <span class="lock-badge" title="需要密碼才能觀看">🔒</span>' : '');
+
+// 密碼保護的作品：顯示輸入密碼畫面，答對就重新顯示這頁
+export function lockNotice(it) {
+  const app = document.getElementById('app');
+  app.innerHTML = `<div class="empty lock-box"><h2>🔒 ${esc(it.title || it.name || '這件作品')}</h2><p>這件作品有設定密碼，請輸入密碼觀看。</p>
+    <form id="lk-f" class="row" style="justify-content:center;max-width:340px;margin:0 auto">
+      <input id="lk-pw" type="password" placeholder="輸入密碼" autocomplete="off" style="flex:1" required>
+      <button class="primary">解鎖</button></form>
+    <p class="muted" id="lk-hint"></p>
+    <p class="muted" id="lk-msg" role="alert"></p>
+    <p><a href="#/">回首頁</a></p></div>`;
+  const pw = app.querySelector('#lk-pw');
+  pw.focus();
+  // 圖片放在上鎖的相簿裡時，要輸入的是相簿的密碼
+  import('./store.js').then(({ lockOf }) => {
+    const src = lockOf(it) || it;
+    const tip = [src !== it ? `這張圖片在上鎖的相簿「${src.name || src.title || ''}」裡，請輸入相簿密碼。` : '', src.lock?.hint ? `提示：${src.lock.hint}` : ''].filter(Boolean).join('　');
+    app.querySelector('#lk-hint').textContent = tip;
+  });
+  app.querySelector('#lk-f').onsubmit = async e => {
+    e.preventDefault();
+    const { tryUnlock } = await import('./store.js');
+    if (await tryUnlock(it, pw.value)) { toast('已解鎖', 'success'); dispatchEvent(new HashChangeEvent('hashchange')); }
+    else { app.querySelector('#lk-msg').textContent = '密碼不對，請再試一次。'; pw.select(); }
+  };
+}
+
+export function privateNotice() {
+  const app = document.getElementById('app');
+  app.innerHTML = `<div class="empty"><h2>🔒 這是私人作品</h2><p>作者設定為私人，登入後才能觀看。</p>
+    <div class="row" style="justify-content:center"><button class="primary" id="pv-login">登入</button><a href="#/"><button>回首頁</button></a></div></div>`;
+  app.querySelector('#pv-login').onclick = async () => {
+    const h = location.hash;
+    if (await (await import('./auth.js')).requireAuth()) { location.hash = h; dispatchEvent(new HashChangeEvent('hashchange')); }
+  };
+}
+// 沒有封面時的佔位字：略過開頭的【示範】、括號與符號，取第一個有意義的字
+export const initialOf = (t, fb = '作') => String(t || '').replace(/^\s*[【\[（(][^】\]）)]*[】\]）)]\s*/, '').replace(/^[\s\p{P}\p{S}]+/u, '')[0] || fb;
 export const fmtDate = iso => iso ? new Date(iso).toLocaleDateString('zh-TW') : '';
 
 // 簡易 HTML 消毒：只允許安全標籤
@@ -139,6 +180,65 @@ export function attachUploadBtn(btn, input) {
     };
     inp.click();
   };
+}
+
+// 讓 input 旁的按鈕從畫廊/相簿挑一張圖，把圖片的 fileId 寫進 input.value
+export function attachGalleryBtn(btn, input) {
+  btn.onclick = async e => {
+    e.preventDefault();
+    const fid = await pickGalleryImage();
+    if (!fid) return;
+    input.value = fid; input.dispatchEvent(new Event('input'));
+    toast('已選擇相簿圖片', 'success');
+  };
+}
+// 圖片挑選視窗：依相簿分頁，回傳 fileId 或 null（取消）；multi 時可複選，依點選順序回傳 fileId 陣列
+export async function pickGalleryImage({ multi = false, title = '從相簿選擇封面' } = {}) {
+  const { db } = await import('./db.js');
+  const [images, albums] = await Promise.all([db.all('images'), db.all('albums')]);
+  const pics = images.filter(i => !i.deleted && i.fileId)
+    .sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+  if (!pics.length) { toast('畫廊還沒有圖片，請先到「圖片」上傳', 'error'); return null; }
+  const albumIds = new Set(albums.map(a => a.id));
+  const tabs = [['', '全部'], ...albums.sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map(a => [a.id, a.name]), ['none', '未放相簿']];
+  return new Promise(resolve => {
+    let picked = null;
+    const sel = [];
+    const isOn = fid => multi ? sel.includes(fid) : fid === picked;
+    modal(`<h3>${esc(title)}</h3>${multi ? '<p class="muted" style="margin:0 0 .5rem">可複選，依點選順序排列</p>' : ''}
+      <div class="row" id="gp-tabs" style="flex-wrap:wrap;gap:.3rem">${tabs.map(([v, n], i) => `<button type="button" data-tab="${esc(v)}" class="${i ? '' : 'primary'}">${esc(n)}</button>`).join('')}</div>
+      <div id="gp-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:.5rem;max-height:55vh;overflow:auto;margin:.8rem 0"></div>
+      <div class="row" style="justify-content:flex-end"><button data-close>取消</button><button id="gp-ok" class="primary" disabled>${multi ? '加入' : '使用這張'}</button></div>`,
+    {
+      onOpen(bg, close) {
+        const grid = bg.querySelector('#gp-grid'), ok = bg.querySelector('#gp-ok');
+        const draw = tab => {
+          const shown = tab === 'none' ? pics.filter(i => !albumIds.has(i.albumId)) : tab ? pics.filter(i => i.albumId === tab) : pics;
+          grid.innerHTML = shown.length ? shown.map(i => `<img data-fid="${esc(i.fileId)}" title="${esc(i.title || '')}" alt="${esc(i.alt || i.title || '')}" style="width:100%;aspect-ratio:3/4;object-fit:cover;cursor:pointer;border-radius:6px;border:3px solid ${isOn(i.fileId) ? 'var(--primary)' : 'transparent'}">`).join('')
+            : '<span class="muted">這裡沒有圖片</span>';
+          hydrateMedia(grid);
+        };
+        bg.querySelector('#gp-tabs').onclick = e => {
+          const b = e.target.closest('[data-tab]'); if (!b) return;
+          bg.querySelectorAll('#gp-tabs button').forEach(x => x.classList.toggle('primary', x === b));
+          draw(b.dataset.tab);
+        };
+        grid.onclick = e => {
+          const im = e.target.closest('img[data-fid]'); if (!im) return;
+          const fid = im.dataset.fid;
+          if (multi) { const k = sel.indexOf(fid); k < 0 ? sel.push(fid) : sel.splice(k, 1); ok.disabled = !sel.length; ok.textContent = sel.length ? `加入 ${sel.length} 張` : '加入'; }
+          else { picked = fid; ok.disabled = false; }
+          grid.querySelectorAll('img').forEach(x => x.style.borderColor = isOn(x.dataset.fid) ? 'var(--primary)' : 'transparent');
+        };
+        grid.ondblclick = e => { if (!multi && e.target.closest('img[data-fid]')) ok.click(); };
+        ok.onclick = () => { resolve(multi ? [...sel] : picked); close(); };
+        // 取消、點背景或其他方式關閉 → null（Promise 只會採用第一次 resolve）
+        const mo = new MutationObserver(() => { if (!bg.isConnected) { mo.disconnect(); resolve(null); } });
+        mo.observe(bg.parentNode, { childList: true });
+        draw('');
+      },
+    });
+  });
 }
 
 // ---- Word 風格富文字工具列（execCommand，跨瀏覽器零依賴）----
@@ -336,6 +436,7 @@ function localDraft(bar, ce, hist, key) {
 
 const MISSING_IMG = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 90"><rect width="120" height="90" rx="8" fill="#efe9dd"/><text x="60" y="52" font-size="11" text-anchor="middle" fill="#a09484">圖片尚未同步</text></svg>');
 const BROKEN_IMG = MISSING_IMG.replace(encodeURIComponent('圖片尚未同步'), encodeURIComponent('圖片無法載入'));
+export const LOCKED_IMG = MISSING_IMG.replace(encodeURIComponent('圖片尚未同步'), encodeURIComponent('🔒 需要密碼'));
 
 // 把內容中的 data-fid 媒體補上 src（顯示用）
 export async function hydrateMedia(root) {
@@ -351,7 +452,11 @@ export async function hydrateMedia(root) {
     m.addEventListener('error', broken);
     if (m.complete && m.getAttribute('src') && !m.naturalWidth) broken();
   }
+  // 設了密碼、還沒解鎖的圖片，在列表、相簿、拼貼牆等處都只顯示鎖頭
+  const { lockedFileIds } = await import('./store.js');
+  const locked = await lockedFileIds();
   for (const m of root.querySelectorAll('[data-fid]')) {
+    if (locked.has(m.dataset.fid)) { m.src = LOCKED_IMG; m.title = '這張圖片有設定密碼'; continue; }
     if (m.src && !/^blob:/i.test(m.src)) continue;
     let f = null;
     try { f = await db.get('files', m.dataset.fid); } catch (e) { console.warn('讀取媒體檔失敗', m.dataset.fid, e); }
@@ -362,6 +467,70 @@ export async function hydrateMedia(root) {
       m.title = '此圖片檔案在本機不存在（可能尚未同步）；請重新上傳或等待雲端載入';
     }
   }
+}
+
+// ---- 裁切視窗：拖曳框身移動到想要的位置、拖四角調大小、可選固定比例 ----
+// 回傳 Promise<{crop, ratio} | undefined>（undefined＝取消；crop 為 null＝不裁切）
+const CROP_RATIOS = [['free', '自由'], ['1', '1:1 方形'], ['0.75', '3:4'], ['1.3333', '4:3'], ['0.6667', '2:3 書封'], ['0.5625', '9:16 手機'], ['1.7778', '16:9 橫幅']];
+export function cropDialog(blob, { crop = null, ratio = '1' } = {}) {
+  return new Promise(async resolve => {
+    const { fitCrop, moveCrop } = await import('./imgedit.js');
+    const url = URL.createObjectURL(blob);
+    let result;
+    const { close } = modal(`
+      <h3>✂ 裁切圖片</h3>
+      <p class="muted" style="margin-top:0">拖曳框框移到想要的位置，拖四個角調整大小。</p>
+      <div class="row" id="cd-ratios" style="flex-wrap:wrap;gap:.3rem;margin-bottom:.6rem">${CROP_RATIOS.map(([v, n]) => `<button type="button" data-r="${v}">${n}</button>`).join('')}</div>
+      <div class="ed-stage"><img id="cd-img" src="${url}" alt="" draggable="false"><div id="cd-box" class="ed-crop">${['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].map(h => `<span class="ed-h ed-${h}" data-h="${h}"></span>`).join('')}</div></div>
+      <p class="muted" id="cd-size" style="text-align:center;margin:.4rem 0"></p>
+      <div class="row" style="justify-content:flex-end;flex-wrap:wrap">
+        <button type="button" id="cd-none" style="margin-right:auto">不裁切</button>
+        <button type="button" data-close>取消</button><button type="button" id="cd-ok" class="primary">完成</button>
+      </div>`, {
+      onOpen(bg) {
+        const img = bg.querySelector('#cd-img'), box = bg.querySelector('#cd-box');
+        const rf = () => (ratio === 'free' || !img.naturalWidth ? null : +ratio * img.naturalHeight / img.naturalWidth);
+        const draw = () => {
+          Object.assign(box.style, { left: crop.x * 100 + '%', top: crop.y * 100 + '%', width: crop.w * 100 + '%', height: crop.h * 100 + '%' });
+          box.classList.toggle('fixed', !!rf());
+          bg.querySelectorAll('[data-r]').forEach(b => b.classList.toggle('primary', b.dataset.r === ratio));
+          bg.querySelector('#cd-size').textContent = `裁切後 ${Math.round(img.naturalWidth * crop.w)} × ${Math.round(img.naturalHeight * crop.h)} px`;
+        };
+        const ready = () => { if (!crop) crop = fitCrop(rf()); draw(); };
+        img.complete && img.naturalWidth ? ready() : (img.onload = ready);
+        bg.querySelector('#cd-ratios').onclick = e => {
+          const b = e.target.closest('[data-r]'); if (!b) return;
+          ratio = b.dataset.r; crop = fitCrop(rf()); draw();
+        };
+        let drag = null;
+        box.addEventListener('pointerdown', e => {
+          e.preventDefault();
+          const r = img.getBoundingClientRect();
+          drag = { h: e.target.dataset.h || 'move', sx: e.clientX, sy: e.clientY, W: r.width, H: r.height, c0: { ...crop } };
+          box.setPointerCapture(e.pointerId);
+        });
+        box.addEventListener('pointermove', e => {
+          if (!drag) return;
+          crop = moveCrop(drag.c0, drag.h, (e.clientX - drag.sx) / drag.W, (e.clientY - drag.sy) / drag.H, rf());
+          draw();
+        });
+        const end = () => { drag = null; };
+        box.addEventListener('pointerup', end); box.addEventListener('pointercancel', end);
+        // 鍵盤微調位置（方向鍵，按住 Shift 移動多一點）
+        bg.addEventListener('keydown', e => {
+          const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+          if (!d || !crop) return;
+          e.preventDefault();
+          const s = e.shiftKey ? 0.05 : 0.01;
+          crop = moveCrop(crop, 'move', d[0] * s, d[1] * s); draw();
+        });
+        bg.querySelector('#cd-ok').onclick = () => { result = { crop: crop.w > 0.999 && crop.h > 0.999 ? null : crop, ratio }; close(); };
+        bg.querySelector('#cd-none').onclick = () => { result = { crop: null, ratio }; close(); };
+        // 不論怎麼關閉都回傳結果並釋放圖片網址
+        new MutationObserver((_, ob) => { if (!bg.isConnected) { ob.disconnect(); URL.revokeObjectURL(url); resolve(result); } }).observe(bg.parentNode, { childList: true });
+      },
+    });
+  });
 }
 
 // ---- 上傳前「原檔／縮小」選擇流程 ----
@@ -378,7 +547,7 @@ export function imageUploadDialog(files) {
       {
         onOpen(bg, close) {
           const rows = bg.querySelector('#up-rows');
-          const state = files.map(f => ({ f, mode: prefs.mode || 'orig', side: prefs.side || 1920, custom: prefs.custom || 1600, quality: prefs.quality || 85, format: prefs.format || 'keep', bg: prefs.bg || '#ffffff', keepOrig: false, dims: null }));
+          const state = files.map(f => ({ f, mode: prefs.mode || 'orig', side: prefs.side || 1920, custom: prefs.custom || 1600, quality: prefs.quality || 85, format: prefs.format || 'keep', bg: prefs.bg || '#ffffff', keepOrig: false, dims: null, crop: null, ratio: prefs.ratio || '1' }));
           const draw = () => {
             rows.innerHTML = '';
             let total = 0;
@@ -387,7 +556,7 @@ export function imageUploadDialog(files) {
               div.className = 'card'; div.style.cssText = 'padding:.6rem;margin:.4rem 0';
               div.innerHTML = `
                 <div class="row">
-                  <img class="thumb" src="${URL.createObjectURL(st.f)}" style="width:56px;height:56px">
+                  <img class="thumb" id="up-th${i}" src="${URL.createObjectURL(st.f)}" style="width:56px;height:56px;object-fit:contain">
                   <div style="flex:1"><b>${esc(st.f.name)}</b> <span class="muted">${fmt(st.f.size)}</span><br><span class="muted" id="up-info${i}"></span></div>
                 </div>
                 <div class="row" style="margin-top:.3rem;flex-wrap:wrap;gap:.4rem">
@@ -398,7 +567,8 @@ export function imageUploadDialog(files) {
                   <select id="up-fmt${i}" ${st.mode !== 'resize' ? 'disabled' : ''}><option value="keep" ${st.format === 'keep' ? 'selected' : ''}>保留格式</option><option value="image/jpeg" ${st.format === 'image/jpeg' ? 'selected' : ''}>JPEG</option><option value="image/webp" ${st.format === 'image/webp' ? 'selected' : ''}>WebP</option></select>
                   <label id="up-q-w${i}" style="display:${st.mode === 'resize' ? '' : 'none'}">品質 <input type="range" id="up-q${i}" min="30" max="100" value="${st.quality}" style="width:80px;vertical-align:middle"><span id="up-qv${i}">${st.quality}%</span></label>
                   <label id="up-bg-w${i}" style="display:none">背景 <input type="color" id="up-bg${i}" value="${st.bg}"></label>
-                  <label id="up-keep-w${i}" style="display:${st.mode === 'resize' ? '' : 'none'}"><input type="checkbox" id="up-keep${i}" ${st.keepOrig ? 'checked' : ''} style="width:auto"> 同時保留原檔</label>
+                  <label id="up-keep-w${i}" style="display:${st.mode === 'resize' || st.crop ? '' : 'none'}"><input type="checkbox" id="up-keep${i}" ${st.keepOrig ? 'checked' : ''} style="width:auto"> 同時保留原檔</label>
+                  ${st.f.type === 'image/gif' ? '' : `<button type="button" id="up-crop${i}" class="${st.crop ? 'primary' : ''}">${st.crop ? '✂ 已裁切（再調整）' : '✂ 裁切'}</button>`}
                 </div>
                 <p class="muted" id="up-prev${i}" style="margin:.2rem 0 0"></p>`;
               rows.appendChild(div);
@@ -412,6 +582,10 @@ export function imageUploadDialog(files) {
               div.querySelector(`#up-q${i}`).oninput = e => { st.quality = +e.target.value; div.querySelector(`#up-qv${i}`).textContent = st.quality + '%'; update(i); };
               div.querySelector(`#up-bg${i}`).onchange = e => { st.bg = e.target.value; update(i); };
               div.querySelector(`#up-keep${i}`).onchange = e => { st.keepOrig = e.target.checked; updTotal(); };
+              div.querySelector(`#up-crop${i}`)?.addEventListener('click', async () => {
+                const r = await cropDialog(st.f, { crop: st.crop, ratio: st.ratio });
+                if (r) { st.crop = r.crop; st.ratio = r.ratio; draw(); }
+              });
             });
             updTotal();
           };
@@ -423,19 +597,22 @@ export function imageUploadDialog(files) {
             const st = state[i];
             const info = bg.querySelector(`#up-info${i}`), prev = bg.querySelector(`#up-prev${i}`);
             const d = st.dims ? `${st.dims[0]}×${st.dims[1]}` : '…';
-            if (st.mode === 'orig') { info.textContent = d; prev.textContent = ''; st._est = st.f.size; updTotal(); return; }
+            const th = bg.querySelector(`#up-th${i}`);
+            if (st.mode === 'orig' && !st.crop) { info.textContent = d; prev.textContent = ''; st._est = st.f.size; st._res = null; updTotal(); return; }
             if (st.f.type === 'image/gif') { info.textContent = d; prev.textContent = '⚠ GIF 動畫無法縮小，將使用原檔'; st._est = st.f.size; updTotal(); return; }
-            const side = st.side || st.custom;
-            const isJpeg = st.format === 'image/jpeg';
+            // 原檔＋裁切：不縮小、保留格式，只裁掉範圍
+            const side = st.mode === 'orig' ? Infinity : st.side || st.custom;
+            const isJpeg = st.mode === 'resize' && st.format === 'image/jpeg';
             bg.querySelector(`#up-bg-w${i}`).style.display = isJpeg ? '' : 'none';
-            bg.querySelector(`#up-q-w${i}`).style.display = (st.format === 'image/png') ? 'none' : '';
+            bg.querySelector(`#up-q-w${i}`).style.display = st.mode !== 'resize' || st.format === 'image/png' ? 'none' : '';
             if (isJpeg) prev.textContent = '⚠ 轉 JPEG 會失去透明背景，已套用背景色';
             try {
               const { resizeImageFile } = await import('./imgedit.js');
-              const r = await resizeImageFile(st.f, { maxSide: side, quality: st.quality, format: st.format, bg: st.bg });
+              const r = await resizeImageFile(st.f, st.mode === 'orig' ? { maxSide: side, quality: 92, crop: st.crop } : { maxSide: side, quality: st.quality, format: st.format, bg: st.bg, crop: st.crop });
+              if (th) th.src = URL.createObjectURL(r.blob);
               st._est = r.size; st._res = r;
               const save = Math.round((1 - r.size / st.f.size) * 100);
-              prev.textContent = `${d} → ${r.width}×${r.height}，${fmt(st.f.size)} → ${fmt(r.size)}${save > 0 ? `，省 ${save}%` : ' ⚠ 處理後更大，建議改用原檔'}`;
+              prev.textContent = st.mode === 'orig' ? `✂ 已裁切：${d} → ${r.width}×${r.height}，${fmt(r.size)}` : `${d} → ${r.width}×${r.height}，${fmt(st.f.size)} → ${fmt(r.size)}${save > 0 ? `，省 ${save}%` : ' ⚠ 處理後更大，建議改用原檔'}`;
             } catch { prev.textContent = '⚠ 無法處理此圖片，將使用原檔'; st._est = st.f.size; }
             updTotal();
           };
@@ -448,12 +625,12 @@ export function imageUploadDialog(files) {
             const out = [];
             for (let i = 0; i < state.length; i++) {
               const st = state[i];
-              if (st.mode === 'resize' && st.f.type !== 'image/gif' && st._res) {
+              if ((st.mode === 'resize' || st.crop) && st.f.type !== 'image/gif' && st._res) {
                 const nf = new File([st._res.blob], st.f.name.replace(/\.[^.]+$/, '') + '.' + st._res.format.split('/')[1], { type: st._res.format });
                 out.push({ file: nf, name: st.f.name, orig: st.keepOrig ? st.f : null });
               } else out.push({ file: st.f, name: st.f.name, orig: null });
             }
-            localStorage.setItem('upPrefs', JSON.stringify({ mode: state[0].mode, side: state[0].side, custom: state[0].custom, quality: state[0].quality, format: state[0].format, bg: state[0].bg }));
+            localStorage.setItem('upPrefs', JSON.stringify({ mode: state[0].mode, side: state[0].side, custom: state[0].custom, quality: state[0].quality, format: state[0].format, bg: state[0].bg, ratio: state[0].ratio }));
             close(); resolve(out);
           };
           bg.querySelector('[data-close]').onclick = () => { close(); resolve(null); };
