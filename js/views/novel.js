@@ -545,6 +545,7 @@ export async function renderNovelDetail(id) {
           ${isAuthed() ? `<button id="edit-meta">編輯資料</button>
           <button id="edit-chs">編輯章節</button>
           <button id="paste-chs">貼上全文</button>
+          <button id="dl-chs" ${chs.length ? '' : 'disabled'}>下載章節</button>
           <button id="share-btn">分享</button>
           <button id="del" class="danger">刪除</button>` : ''}
           <span class="muted">👁 ${n.views || 0} 次觀看</span>
@@ -591,8 +592,91 @@ export async function renderNovelDetail(id) {
     document.getElementById('edit-meta').onclick = () => editMeta(n, cats);
     document.getElementById('edit-chs').onclick = () => chapterEditor(n);
     document.getElementById('paste-chs').onclick = () => chapterEditor(n, { paste: true });
+    document.getElementById('dl-chs').onclick = () => downloadChapters(n);
     document.getElementById('share-btn').onclick = () => shareDialog(n);
   }
+}
+
+// 「1-5, 8, 10-」→ 章節索引集合（從 1 起算，結尾留空代表到最後一章）
+function parseRange(s, total) {
+  const out = new Set();
+  for (const part of String(s).split(/[,，、\s]+/).filter(Boolean)) {
+    const m = part.match(/^(\d*)\s*[-~～–]\s*(\d*)$/) || part.match(/^(\d+)$/);
+    if (!m) return null;
+    const a = m[1] ? +m[1] : 1, b = m.length > 2 ? (m[2] ? +m[2] : total) : a;
+    for (let i = Math.max(1, Math.min(a, b)); i <= Math.min(total, Math.max(a, b)); i++) out.add(i - 1);
+  }
+  return out;
+}
+
+function saveTextFile(name, text) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + text.replace(/\r?\n/g, '\r\n')], { type: 'text/plain;charset=utf-8' }));
+  a.download = name.replace(/[\\/:*?"<>|]/g, '_') + '.txt';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// 創作者下載指定章節：勾選或輸入範圍，合併成一個 TXT 或每章各一檔
+function downloadChapters(n) {
+  const chs = n.chapters || [];
+  const sel = new Set();
+  modal(`
+    <h3>下載章節「${esc(fullTitle(n))}」</h3>
+    <div class="row"><input id="dl-range" placeholder="輸入範圍，例如 1-5, 8, 10-" style="flex:1"><button id="dl-apply">套用範圍</button></div>
+    <div class="row" style="margin:.4rem 0">
+      ${chs.length > 10 ? '<input id="dl-q" placeholder="搜尋章節…" style="flex:1">' : ''}
+      <button id="dl-all">全選</button><button id="dl-none">全不選</button>
+    </div>
+    <div id="dl-list" style="max-height:45vh;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:.4em">
+      ${chs.map((c, i) => `<label class="chapter-item" data-i="${i}" data-t="${esc(c.title)}" style="margin:0;cursor:pointer"><input type="checkbox" value="${i}" style="width:auto"><span class="muted">${i + 1}</span><span style="flex:1">${esc(c.title)}</span><span class="muted">${c.content.length} 字</span></label>`).join('')}
+    </div>
+    <label>檔案格式</label>
+    <select id="dl-mode"><option value="merge">合併成一個 TXT</option><option value="each">每章各一個 TXT</option></select>
+    <label><input type="checkbox" id="dl-head" checked style="width:auto"> 開頭加上書名與作者</label>
+    <div class="row" style="justify-content:flex-end;margin-top:.8rem"><span id="dl-count" class="muted" style="flex:1"></span><button data-close>取消</button><button id="dl-ok" class="primary">下載</button></div>`,
+    {
+      onOpen(bg, close) {
+        const boxes = [...bg.querySelectorAll('#dl-list input')];
+        const sync = () => {
+          boxes.forEach(b => b.checked = sel.has(+b.value));
+          const words = [...sel].reduce((s, i) => s + chs[i].content.length, 0);
+          bg.querySelector('#dl-count').textContent = `已選 ${sel.size} 章・${words} 字`;
+        };
+        boxes.forEach(b => b.onchange = () => { b.checked ? sel.add(+b.value) : sel.delete(+b.value); sync(); });
+        const visible = () => boxes.filter(b => b.closest('label').style.display !== 'none');
+        bg.querySelector('#dl-all').onclick = () => { visible().forEach(b => sel.add(+b.value)); sync(); };
+        bg.querySelector('#dl-none').onclick = () => { visible().forEach(b => sel.delete(+b.value)); sync(); };
+        bg.querySelector('#dl-q')?.addEventListener('input', e => {
+          const q = e.target.value.trim();
+          bg.querySelectorAll('#dl-list label').forEach(l => l.style.display = !q || l.dataset.t.includes(q) ? '' : 'none');
+        });
+        const applyRange = () => {
+          const r = parseRange(bg.querySelector('#dl-range').value, chs.length);
+          if (!r || !r.size) return toast('範圍格式不正確，例如 1-5, 8, 10-', 'error');
+          sel.clear(); r.forEach(i => sel.add(i)); sync();
+        };
+        bg.querySelector('#dl-apply').onclick = applyRange;
+        bg.querySelector('#dl-range').addEventListener('keydown', e => { if (e.key === 'Enter') applyRange(); });
+        bg.querySelector('#dl-ok').onclick = async () => {
+          if (!sel.size) return toast('請先選擇章節', 'error');
+          const idx = [...sel].sort((a, b) => a - b);
+          const head = bg.querySelector('#dl-head').checked ? `${fullTitle(n)}\n作者：${n.author || '佚名'}\n\n` : '';
+          const body = c => `${c.title}\n\n${c.content.trim()}\n`;
+          if (bg.querySelector('#dl-mode').value === 'each') {
+            for (const i of idx) {
+              saveTextFile(`${fullTitle(n)}_${String(i + 1).padStart(String(chs.length).length, '0')}_${chs[i].title}`, head + body(chs[i]));
+              await new Promise(r => setTimeout(r, 250)); // 連續下載間隔，避免瀏覽器擋下
+            }
+          } else {
+            const label = idx.length === chs.length ? '全文' : idx.length === 1 ? chs[idx[0]].title : `第${idx[0] + 1}-${idx[idx.length - 1] + 1}章`;
+            saveTextFile(`${fullTitle(n)}_${label}`, head + idx.map(i => body(chs[i])).join('\n\n'));
+          }
+          close(); toast(`已下載 ${idx.length} 章`, 'success');
+        };
+        sync();
+      }
+    });
 }
 
 // 章節編輯器：改名/改內文/新增/刪除/排序
