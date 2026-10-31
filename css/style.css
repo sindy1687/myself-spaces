@@ -526,11 +526,11 @@ body[data-theme] .feat-slide.on .feat-cover:not(.wide):hover img{transform:none}
   .pts-badge{margin-left:0;padding:.15em .65em;font-size:.82rem}
   .pts-long{display:none}
   .pts-short{display:inline}
-  /* 閱讀列：按鈕換行全部看得到（原本擠在一行要橫向滑動才找得到後面的按鈕）；
-     寬度設定在手機上沒有用處就藏起來；不固定在頂端，免得兩排按鈕擋住內文 */
-  .reader-bar{position:static;flex-wrap:wrap;overflow:visible;padding:.4rem;gap:.35rem}
-  .reader-bar>a{flex:1 1 100%;order:-1;overflow:hidden;text-overflow:ellipsis;font-size:.9em}
-  .reader-bar>span.muted{margin-left:0!important}
+  /* 閱讀列：手機上一樣固定在頂端，捲動內文時不會消失；按鈕排成一行，往左滑可看到後面的按鈕 */
+  .reader-bar{position:sticky;top:var(--header-h,52px);flex-wrap:nowrap;overflow-x:auto;padding:.3rem .4rem;gap:.3rem;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .reader-bar::-webkit-scrollbar{display:none}
+  .reader-bar>a{flex:none;max-width:8em;overflow:hidden;text-overflow:ellipsis;font-size:.85em}
+  .reader-bar>span.muted{margin-left:0!important;flex:none;font-size:.85em}
   .reader-bar #rw{display:none}
   .reader-bar :is(button,select){padding:.3em .55em;font-size:.82em}
   /* 小說頁：電子書封面置中 */
