@@ -69,10 +69,18 @@ export function requireAuth() {
               setAuthed(true); toast('密碼已設定', 'success'); return done(true);
             }
             if (!user || !pw) return err('請輸入帳號和密碼');
-            // 站長帳密（只在你的網站、本機驗證）
+            // 站長帳密（只在你的網站）：雲端驗證並取得金鑰，之後同步、市集都靠這把金鑰；
+            // 雲端連不上或還是舊版時，退回本機比對（可以管理，但不能同步）
             if (!WS && user === owner) {
-              if (await sha(pw) === s.adminPwHash) { setAuthed(true); return done(true); }
-              return err('帳號或密碼錯誤');
+              $('#a-ok').disabled = true; err('驗證中…');
+              try {
+                const key = await deriveKey(user, pw);
+                const r = await accountCall('ownerSetup', { pw, key }).catch(() => null);
+                if (r?.ok) { setAuthed(true, key); return done(true); }
+                if (r && r.code) return err(r.error || '帳號或密碼錯誤');
+                if (await sha(pw) === s.adminPwHash) { setAuthed(true); toast('雲端驗證失敗（Apps Script 可能還是舊版），這次登入不會同步', 'error'); return done(true); }
+                return err('帳號或密碼錯誤');
+              } finally { $('#a-ok').disabled = false; }
             }
             // 其他人：到雲端驗證，成功就進到他自己的網站
             if (!validName(user)) return err('帳號或密碼錯誤');
@@ -142,9 +150,14 @@ export async function changePassword(oldPw, newPw) {
     setAuthed(true, newKey);
     return;
   }
-  const s = await getSettings();
-  if (s.adminPwHash && await sha(oldPw) !== s.adminPwHash) throw new Error('原密碼錯誤');
+  // 站長：先讓雲端用舊密碼確認並換成新金鑰，再改本機
+  const s = await getSettings(), owner = s.adminUser || 'admin';
+  const newKey = await deriveKey(owner, newPw);
+  const r = await accountCall('ownerSetup', { pw: oldPw, key: newKey }).catch(() => null);
+  if (r && !r.ok) throw new Error(r.code === 'bad-login' ? '原密碼錯誤' : r.error || '更改失敗');
+  if (!r && s.adminPwHash && await sha(oldPw) !== s.adminPwHash) throw new Error('原密碼錯誤');
   await saveSettings({ adminPwHash: await sha(newPw) });
+  setAuthed(true, r?.ok ? newKey : undefined);
 }
 
 export { wsKey };

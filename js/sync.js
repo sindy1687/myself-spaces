@@ -5,7 +5,7 @@
 import { db, SYNCED } from './db.js';
 import { getSettings, saveSettings } from './store.js';
 import { dataURLToBlob } from './util.js';
-import { WS, authed } from './workspace.js';
+import { WS, authed, wsKey, authFields } from './workspace.js';
 
 const POLL_MS = 45000, UPLOAD_DELAY = 4000;
 const dataURLToBlobSafe = d => { try { return dataURLToBlob(d); } catch { return null; } };
@@ -23,6 +23,13 @@ const gasGet = async (url, params) => {
   if (!r.ok) throw Object.assign(new Error(r.error || '讀取失敗'), { code: r.code });
   return r;
 };
+// 登入的本人：帶金鑰讀完整資料（含私人作品）；GET 只會拿到公開的部分
+const gasPost = async (url, payload) => {
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ ...payload, ...authFields() }) }).then(x => x.json());
+  if (!r.ok) throw Object.assign(new Error(r.code === 'bad-login' ? '登入已失效，請登出後重新登入' : r.error || '讀取失敗'), { code: r.code });
+  return r;
+};
+const asOwner = () => authed() && !!wsKey();
 
 // 把雲端資料合併進本機；authoritative＝訪客（雲端說了算，本機多的也刪掉）
 // 回傳 { changed, needFiles }
@@ -107,7 +114,8 @@ export async function mergeRemote(data, { authoritative = false, dbx = db } = {}
 async function fetchFiles(url, ids) {
   for (let i = 0; i < ids.length; i += 15) {
     try {
-      const r = await gasGet(url, 'files=' + ids.slice(i, i + 15).join(','));
+      const batch = ids.slice(i, i + 15).join(',');
+      const r = asOwner() ? await gasPost(url, { action: 'getFiles', ids: batch }) : await gasGet(url, 'files=' + batch);
       for (const [id, d] of Object.entries(r.files || {})) { const b = dataURLToBlobSafe(d); if (b) await db.putRaw('files', { id, blob: b }); }
     } catch (e) { console.warn('下載圖片失敗', e); return; }
   }
@@ -120,9 +128,10 @@ export async function pull({ force = false } = {}) {
   const head = await gasGet(s.gasUrl, 'meta=1');
   const stamp = head.exportedAt || head.data?.exportedAt || '';
   if (!stamp || (!force && stamp === s._appliedRemote)) return false;
-  const r = head.data ? head : await gasGet(s.gasUrl, 'lite=1');
+  const r = head.data ? head : asOwner() ? await gasPost(s.gasUrl, { action: 'getData', lite: true }) : await gasGet(s.gasUrl, 'lite=1');
   const data = r.data;
   if (!data) return false;
+  // 登入了但沒有金鑰（舊的登入狀態）只拿得到公開資料：照一般合併，不會刪掉本機的私人作品
   const { changed, needFiles } = await mergeRemote(data, { authoritative: !authed() });
   if (needFiles.length) await fetchFiles(s.gasUrl, needFiles);
   await saveSettings({ _appliedRemote: stamp });

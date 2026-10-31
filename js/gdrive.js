@@ -1,7 +1,7 @@
 // Google Drive 同步（OAuth + Drive API, scope: drive.file）
 // 需要使用者在管理後台填入自己的 OAuth Client ID（Web 應用程式類型，不需 secret）
 import { exportAll, importAll, getSettings, saveSettings } from './store.js';
-import { WS, wsKey } from './workspace.js';
+import { WS, wsKey, authFields } from './workspace.js';
 
 // 讀取網址加上 u=名字（其他人的網站讀他自己的資料檔）
 const withUser = (url, extra = '') => url + (url.includes('?') ? '&' : '?') + [WS ? 'u=' + encodeURIComponent(WS) : '', extra].filter(Boolean).join('&');
@@ -206,10 +206,26 @@ export async function resolveConflict(choice) {
   setState({ status: 'connected', lastSync: new Date().toISOString() });
 }
 
+// 發文獎勵：Apps Script 在存檔時順便發點數，這裡跳通知、更新頁首點數
+function announceReward(r) {
+  if (!r || typeof dispatchEvent !== 'function') return;
+  if (typeof r.balance === 'number') dispatchEvent(new CustomEvent('points-changed', { detail: { balance: r.balance } }));
+  const got = r.got || [], capped = r.capped || [];
+  // 沒拿到點數的原因每篇只提醒一次（這個分頁內），不然每次自動同步都會跳
+  const once = key => { try { const k = 'reward-note:' + key; if (sessionStorage.getItem(k)) return false; sessionStorage.setItem(k, '1'); } catch { /* 無痕模式 */ } return true; };
+  const short = (r.short || []).filter(s => once(`short:${s.title}:${Math.floor(s.len / 100)}`));
+  const say = (msg, type) => import('./util.js').then(u => u.toast(msg, type));
+  if (got.length) say(`🎉 發文獎勵 +${got.length * r.each} 點（${got.join('、')}）`, 'success');
+  else if (capped.length && once('cap:' + capped[0])) say(`今天的發文點數已達上限（每天 3 篇），「${capped[0]}」這篇沒有點數`);
+  else if (short.length) say(`「${short[0].title}」目前 ${short[0].len} 字，滿 ${r.minLen} 字就會得到發文點數`);
+}
+
 // ---- 經由 Google Apps Script Web App 上傳/讀取（免 OAuth）----
+// 登入的本人用 POST 帶金鑰讀完整備份（含私人作品）；GET 只會拿到公開的部分
 export async function loadViaAppsScript(webAppUrl) {
-  const r = await fetch(WS ? withUser(webAppUrl) : webAppUrl); // GET 回傳最新完整備份
-  const res = await r.json();
+  if (!wsKey()) throw new Error('請先登出再重新登入，才能讀取完整的雲端資料');
+  const res = await fetch(webAppUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'getData', ...authFields() }) }).then(r => r.json());
+  if (res.code === 'bad-login') throw new Error('登入已失效，請登出後重新登入');
   if (!res.ok) throw new Error(res.error || '讀取失敗');
   return res.data;
 }
@@ -256,8 +272,8 @@ export async function uploadViaAppsScript(webAppUrl, folderId, deps = {}) {
   setState({ status: 'syncing', progress: '匯出資料中…', error: null });
   const post = payload => fetch(webAppUrl, {
     method: 'POST', headers: { 'Content-Type': 'text/plain' }, // 避免 CORS preflight
-    // 其他人的網站：帶上帳號與金鑰，Apps Script 只讓本人寫入自己的資料夾
-    body: JSON.stringify(WS ? { ...payload, u: WS, key: wsKey() } : payload),
+    // 帶上帳號與金鑰，Apps Script 只讓本人寫入自己的資料夾（站長也要帶站長金鑰）
+    body: JSON.stringify({ ...payload, ...authFields() }),
   }).then(r => r.json()).then(res => {
     if (res.code === 'bad-login') throw new Error('登入已失效，請登出後重新登入再上傳');
     if (!res.ok) throw new Error(res.error || 'Apps Script 回傳錯誤'); return res;
@@ -286,7 +302,8 @@ export async function uploadViaAppsScript(webAppUrl, folderId, deps = {}) {
     const jsonSame = remote?.hasData && last.fp === fp && last.at && last.at === remote.exportedAt;
     if (!jsonSame) {
       setState({ progress: '上傳文字資料…' });
-      await post({ action: 'putJson', folderId, data });
+      const pj = await post({ action: 'putJson', folderId, data });
+      announceReward(pj.reward);
     }
 
     let sent = 0;

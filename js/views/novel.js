@@ -31,6 +31,8 @@ function volSelect(id, cur, attrs = '') {
   return `<select ${id ? `id="${id}"` : ''} ${attrs}>${opts.map(o => `<option value="${esc(o)}" ${String(o) === String(cur ?? '') ? 'selected' : ''}>${o === '' ? '（不分卷）' : esc(volumeLabel(o))}</option>`).join('')}</select>`;
 }
 const readVol = v => /^\d+$/.test(v) ? +v : v;
+const MIN_CH = 800; // 匯入時少於這個字數的章自動刪除
+const PASTE_MIN_CH = 500; // 對已建立的小說「貼上全文」時，少於這個字數的章自動刪除
 
 function statusBadge(s) {
   if (!s) return '';
@@ -436,7 +438,7 @@ export function renderNovelImport() {
     if (!chapters.length) chapters = [{ title: '全文', content: '' }];
     const sv = splitVolume(meta.title || title);
     pv.innerHTML = `
-      <h2 class="section-title">章節預覽（共 ${chapters.length} 章・${totalLen} 字）</h2>
+      <h2 class="section-title">章節預覽（共 <span id="ch-count">${chapters.length}</span> 章・${totalLen} 字）</h2>
       <div class="card">
         <div class="row"><div style="flex:3"><label>小說名稱</label><input id="n-title" value="${esc(sv.title)}"></div>
           <div style="flex:1;min-width:8em"><label>卷數</label>${volSelect('n-vol', sv.volume)}</div></div>
@@ -444,6 +446,7 @@ export function renderNovelImport() {
         <label>作者</label><input id="n-author" value="${esc(meta.author || '')}">
         <label>簡介 / 大綱</label><textarea id="n-desc" rows="3">${esc(meta.desc || '')}</textarea>
         <label>封面圖片</label><div class="field-inline"><input id="n-cover" placeholder="貼上圖片網址、上傳，或從相簿選"><button id="n-cover-up" type="button">上傳</button><button id="n-cover-gal" type="button">🖼 從相簿選</button></div>
+        <div id="short-note" class="muted" style="margin-top:.8rem"></div>
         <div id="ch-list" style="margin-top:.8rem"></div>
         <div class="row" style="margin-top:.8rem">
           <button id="add-ch">＋ 新增章節</button>
@@ -454,8 +457,28 @@ export function renderNovelImport() {
       </div>`;
     const listEl = document.getElementById('ch-list');
     let chs = chapters.map(c => ({ id: uid(), ...c }));
+    // 少於 MIN_CH 字的章（目錄行、廣告、作者的話等）自動刪除；全部都很短時（短篇）就不刪
+    const order = chs.map(c => c.id);
+    let removed = chs.filter(c => c.content.length < MIN_CH);
+    if (removed.length === chs.length) removed = [];
+    chs = chs.filter(c => !removed.includes(c));
+    const noteEl = document.getElementById('short-note');
+    const drawNote = () => {
+      noteEl.innerHTML = removed.length ? `已自動刪除 ${removed.length} 個少於 ${MIN_CH} 字的章節（${removed.slice(0, 3).map(c => esc(c.title)).join('、')}${removed.length > 3 ? '…' : ''}）<button id="short-restore" type="button" style="margin-left:.5em">還原</button>` : '';
+      const b = noteEl.querySelector('#short-restore');
+      if (b) b.onclick = () => {
+        // 放回原本位置：插在原順序中前一個還在的章後面
+        for (const r of removed) {
+          const prev = order.slice(0, order.indexOf(r.id)).reverse().find(id => chs.some(c => c.id === id));
+          chs.splice(prev ? chs.findIndex(c => c.id === prev) + 1 : 0, 0, r);
+        }
+        removed = []; drawNote(); draw();
+      };
+    };
+    drawNote();
 
     function draw() {
+      document.getElementById('ch-count').textContent = chs.length;
       listEl.innerHTML = chs.map((c, i) => `
         <div class="chapter-item" draggable="true" data-i="${i}">
           <span class="muted">${i + 1}.</span>
@@ -531,7 +554,7 @@ export async function renderNovelDetail(id) {
   const app = document.getElementById('app');
   app.innerHTML = `
     <div class="card" style="display:flex;gap:1.5rem;flex-wrap:wrap">
-      ${n.cover || defCover ? `<div style="position:relative;align-self:flex-start">${volBadge(n)}<img ${coverSrc(n.cover || defCover)} style="width:180px;border-radius:var(--radius);display:block" alt="封面"></div>` : ''}
+      ${n.cover || defCover ? `<div class="ebook">${volBadge(n)}<img ${coverSrc(n.cover || defCover)} alt="封面"></div>` : ''}
       <div style="flex:1;min-width:240px">
         <h1 style="margin-top:0">${esc(n.title)} ${volPill(n)} ${n.demo ? '<span class="tag">示範</span>' : ''}</h1>
         ${sib.length ? `<p class="series-line">📚 叢書<a href="#/novels?series=${encodeURIComponent(n.series)}">《${esc(n.series)}》</a>第 ${si + 1} / ${sib.length} 本
@@ -680,11 +703,23 @@ function downloadChapters(n) {
 }
 
 // 章節編輯器：改名/改內文/新增/刪除/排序
+// 可以勾選多章一次刪除或搬移（按住 Shift 點勾選框可連選一段）
 function chapterEditor(n, opts = {}) {
-  let chs = (n.chapters || []).map(c => ({ ...c }));
+  let chs = (n.chapters || []).map(c => ({ ...c, id: c.id || uid() }));
+  const sel = new Set();
+  let lastI = -1;
   modal(`
-    <h3>編輯章節「${esc(n.title)}」（${chs.length} 章）</h3>
+    <h3>編輯章節「${esc(n.title)}」（<span id="ce-total">${chs.length}</span> 章）</h3>
     ${chs.length > 10 ? '<input id="ce-q" placeholder="搜尋章節…" style="margin-bottom:.4rem">' : ''}
+    <div class="ce-bulk">
+      <label class="ce-all"><input type="checkbox" id="ce-all" style="width:auto"> 全選</label>
+      <span id="ce-count" class="muted">已選 0 章</span>
+      <span class="ce-bulk-btns">
+        <button data-b="up" title="選取的章往上移一格">↑ 上移</button><button data-b="down" title="選取的章往下移一格">↓ 下移</button>
+        <button data-b="top">移到最前</button><button data-b="bottom">移到最後</button><button data-b="to">移到第…章後</button>
+        <button data-b="del" class="danger">刪除選取</button>
+      </span>
+    </div>
     <div id="ce-list" style="max-height:50vh;overflow:auto"></div>
     <div class="row" style="margin-top:.8rem">
       <button id="ce-add">＋ 新增章節</button>
@@ -696,22 +731,65 @@ function chapterEditor(n, opts = {}) {
     {
       onOpen(bg, close) {
         const listEl = bg.querySelector('#ce-list');
+        const q = () => bg.querySelector('#ce-q')?.value.trim() || '';
+        const visible = () => chs.filter(c => !q() || c.title.includes(q()));
         function draw() {
-          const q = bg.querySelector('#ce-q')?.value.trim() || '';
+          for (const id of [...sel]) if (!chs.some(c => c.id === id)) sel.delete(id);
           listEl.innerHTML = chs.map((c, i) => `
-            <div class="chapter-item" data-i="${i}" style="${q && !c.title.includes(q) ? 'display:none' : ''}">
+            <div class="chapter-item ce-row${sel.has(c.id) ? ' ce-on' : ''}" data-i="${i}" style="${q() && !c.title.includes(q()) ? 'display:none' : ''}">
+              <input type="checkbox" class="ce-sel" ${sel.has(c.id) ? 'checked' : ''} aria-label="選取第 ${i + 1} 章" style="width:auto">
               <span class="muted">${i + 1}.</span>
-              <input value="${esc(c.title)}" data-f="t" style="flex:1">
-              <span class="muted">${c.content.length} 字</span>
-              <button data-a="edit">編輯內文</button>
-              <button data-a="up" ${i === 0 ? 'disabled' : ''}>↑</button>
-              <button data-a="down" ${i === chs.length - 1 ? 'disabled' : ''}>↓</button>
-              <button data-a="del">✕</button>
+              <input class="ce-title" value="${esc(c.title)}" data-f="t">
+              <span class="muted ce-len">${c.content.length} 字</span>
+              <span class="ce-acts">
+                <button data-a="edit">編輯內文</button>
+                <button data-a="up" ${i === 0 ? 'disabled' : ''} aria-label="上移">↑</button>
+                <button data-a="down" ${i === chs.length - 1 ? 'disabled' : ''} aria-label="下移">↓</button>
+                <button data-a="del" aria-label="刪除">✕</button>
+              </span>
             </div>`).join('');
+          bg.querySelector('#ce-total').textContent = chs.length;
+          bg.querySelector('#ce-count').textContent = `已選 ${sel.size} 章`;
+          bg.querySelectorAll('[data-b]').forEach(b => { b.disabled = !sel.size; });
+          const vis = visible();
+          const all = bg.querySelector('#ce-all');
+          all.checked = vis.length > 0 && vis.every(c => sel.has(c.id));
+          all.indeterminate = !all.checked && vis.some(c => sel.has(c.id));
         }
         draw();
         bg.querySelector('#ce-q')?.addEventListener('input', draw);
-        listEl.addEventListener('input', e => { const i = +e.target.closest('[data-i]').dataset.i; chs[i].title = e.target.value; });
+        listEl.addEventListener('input', e => { if (e.target.dataset.f !== 't') return; const i = +e.target.closest('[data-i]').dataset.i; chs[i].title = e.target.value; });
+        // 勾選：Shift 連選一段
+        listEl.addEventListener('click', e => {
+          if (!e.target.classList.contains('ce-sel')) return;
+          const i = +e.target.closest('[data-i]').dataset.i, on = e.target.checked;
+          const range = e.shiftKey && lastI >= 0 ? chs.slice(Math.min(lastI, i), Math.max(lastI, i) + 1) : [chs[i]];
+          range.filter(c => !q() || c.title.includes(q())).forEach(c => on ? sel.add(c.id) : sel.delete(c.id));
+          lastI = i;
+          draw();
+        });
+        bg.querySelector('#ce-all').onchange = e => { visible().forEach(c => e.target.checked ? sel.add(c.id) : sel.delete(c.id)); draw(); };
+        // 批次：刪除、上下移一格（選取的章各自移，順序不變）、移到最前／最後／某章之後
+        bg.querySelector('.ce-bulk-btns').addEventListener('click', async e => {
+          const b = e.target.closest('[data-b]')?.dataset.b; if (!b || !sel.size) return;
+          const picked = chs.filter(c => sel.has(c.id)), rest = chs.filter(c => !sel.has(c.id));
+          if (b === 'del') {
+            if (!await confirmDialog(`刪除選取的 ${picked.length} 章？（按「儲存全部」後才會寫入）`, { danger: true, okText: '刪除' })) return;
+            chs = rest; sel.clear();
+          }
+          if (b === 'up') for (let i = 1; i < chs.length; i++) if (sel.has(chs[i].id) && !sel.has(chs[i - 1].id)) [chs[i - 1], chs[i]] = [chs[i], chs[i - 1]];
+          if (b === 'down') for (let i = chs.length - 2; i >= 0; i--) if (sel.has(chs[i].id) && !sel.has(chs[i + 1].id)) [chs[i + 1], chs[i]] = [chs[i], chs[i + 1]];
+          if (b === 'top') chs = [...picked, ...rest];
+          if (b === 'bottom') chs = [...rest, ...picked];
+          if (b === 'to') {
+            const at = await askChapterNo(chs.length);
+            if (at == null) return;
+            // 插在「目前第 at 章」之後：算出前面有幾個沒被選的章
+            const pos = chs.slice(0, at).filter(c => !sel.has(c.id)).length;
+            chs = [...rest.slice(0, pos), ...picked, ...rest.slice(pos)];
+          }
+          draw();
+        });
         listEl.addEventListener('click', e => {
           const b = e.target.closest('[data-a]'); if (!b) return;
           const i = +b.closest('[data-i]').dataset.i, a = b.dataset.a;
@@ -740,6 +818,25 @@ function chapterEditor(n, opts = {}) {
     });
 }
 
+// 「移到第…章後」：問要放在目前第幾章之後（0＝最前面）
+function askChapterNo(total) {
+  return new Promise(res => {
+    modal(`<h3>移到第幾章之後？</h3>
+      <p class="muted" style="margin-top:0">輸入目前的章節編號，選取的章會接在它後面；輸入 0 放到最前面。</p>
+      <input id="ce-to" type="number" min="0" max="${total}" value="0" inputmode="numeric">
+      <div class="row" style="justify-content:flex-end;margin-top:.8rem"><button data-close>取消</button><button id="ce-to-ok" class="primary">移動</button></div>`, {
+      onOpen(bg, close) {
+        const done = v => { close(); res(v); };
+        bg.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => res(null)));
+        const ok = () => { const v = Math.floor(+bg.querySelector('#ce-to').value); if (v >= 0 && v <= total) done(v); else toast(`請輸入 0–${total}`, 'error'); };
+        bg.querySelector('#ce-to-ok').onclick = ok;
+        bg.querySelector('#ce-to').addEventListener('keydown', e => { if (e.key === 'Enter') ok(); });
+        bg.querySelector('#ce-to').select();
+      },
+    });
+  });
+}
+
 // 對已建立的小說貼上全文（或選 TXT），自動辨識章節後取代／附加／補上新章
 function pasteChapters(current, apply) {
   modal(`
@@ -760,7 +857,8 @@ function pasteChapters(current, apply) {
         const ta = bg.querySelector('#pc-text'), modeEl = bg.querySelector('#pc-mode'), prev = bg.querySelector('#pc-prev');
         const norm = t => String(t || '').replace(/\s+/g, '');
         const have = new Set(current.map(c => norm(c.title)));
-        let parsed = [];
+        // 少於 PASTE_MIN_CH 字的章（目錄、廣告、作者的話）自動刪除；全部都很短就不刪；按「還原」可保留
+        let parsed = [], removed = [], keepShort = false;
         const result = () => {
           const mode = modeEl.value;
           const add = mode === 'new' ? parsed.filter(c => !have.has(norm(c.title))) : parsed;
@@ -769,12 +867,19 @@ function pasteChapters(current, apply) {
         const refresh = () => {
           const text = ta.value;
           parsed = text.trim() ? splitChapters(text).filter(c => c.title !== '(卷首)' || c.content.trim()).map(c => ({ id: uid(), ...c })) : [];
+          removed = [];
+          if (!keepShort) {
+            const short = parsed.filter(c => c.content.length < PASTE_MIN_CH);
+            if (short.length < parsed.length) { removed = short; parsed = parsed.filter(c => !short.includes(c)); }
+          }
           if (!parsed.length) return prev.innerHTML = '';
           const { add, next } = result();
-          prev.innerHTML = `辨識到 ${parsed.length} 章，將套用 ${add.length} 章（套用後共 ${next.length} 章）<ol style="margin:.3rem 0 0 1.2rem">${add.map(c => `<li>${esc(c.title)} <span class="muted">${c.content.length} 字</span></li>`).join('')}</ol>`;
+          const note = removed.length ? `<p style="color:var(--primary);margin:0 0 .4rem">已自動刪除 ${removed.length} 個少於 ${PASTE_MIN_CH} 字的章節（${removed.slice(0, 3).map(c => esc(c.title)).join('、')}${removed.length > 3 ? '…' : ''}）<button type="button" id="pc-keep" style="margin-left:.5em">還原</button></p>` : '';
+          prev.innerHTML = `${note}辨識到 ${parsed.length + removed.length} 章，將套用 ${add.length} 章（套用後共 ${next.length} 章）<ol style="margin:.3rem 0 0 1.2rem">${add.map(c => `<li>${esc(c.title)} <span class="muted">${c.content.length} 字</span></li>`).join('')}</ol>`;
         };
         ta.addEventListener('input', debounce(refresh, 400));
         modeEl.onchange = refresh;
+        prev.addEventListener('click', e => { if (e.target.id === 'pc-keep') { keepShort = true; refresh(); } });
         const fi = bg.querySelector('#pc-file');
         bg.querySelector('#pc-pick').onclick = e => { e.preventDefault(); fi.click(); };
         fi.onchange = async () => {

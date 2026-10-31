@@ -1,16 +1,18 @@
 // 首頁與全站搜尋
 import { list, getSettings, listCategories } from '../store.js';
 import { db } from '../db.js';
-import { hydrateMedia, initialOf, lockBadge } from '../util.js';
+import { hydrateMedia, initialOf, lockBadge, fileObjectURL } from '../util.js';
 import { allWorks } from '../store.js';
 let _defCover = '';
 
 // 把 <img data-fid> 的 src 從 IndexedDB blob 補上
 async function hydrateImages(root) {
-  for (const img of root.querySelectorAll('img[data-fid]')) {
-    const f = await db.get('files', img.dataset.fid);
-    if (f) img.src = URL.createObjectURL(f.blob);
-  }
+  await Promise.all([...root.querySelectorAll('img[data-fid]')].map(async img => {
+    const url = await fileObjectURL(img.dataset.fid);
+    img.decoding = 'async';
+    if (!img.hasAttribute('loading')) img.loading = 'lazy';
+    if (url) img.src = url;
+  }));
 }
 import { esc, fmtDate, isFid, toast } from '../util.js';
 import { pageShell } from '../app.js';

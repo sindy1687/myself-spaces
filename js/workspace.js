@@ -17,9 +17,12 @@ export function setAuthed(on, key, ws = WS) {
     if (on) { sessionStorage.setItem(a, '1'); if (key) sessionStorage.setItem(k, key); }
     else { sessionStorage.removeItem(a); sessionStorage.removeItem(k); }
   } catch { /* 無痕模式 */ }
+  if (typeof dispatchEvent === 'function') dispatchEvent(new CustomEvent('auth-changed'));
 }
 // 上傳到雲端時證明身分用（由帳密算出，不是密碼本身）
 export const wsKey = () => { try { return sessionStorage.getItem(KEY_KEY) || ''; } catch { return ''; } };
+// 呼叫 Apps Script 時證明身分：其他人帶帳號＋金鑰，站長只帶站長金鑰
+export const authFields = () => (WS ? { u: WS, key: wsKey() } : { key: wsKey() });
 
 export async function deriveKey(user, pw) {
   const { hashPassword } = await import('./store.js');

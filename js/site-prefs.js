@@ -20,9 +20,8 @@ const safeUrl = u => (/^(https?:|mailto:|#)/i.test(u) ? u : /^[^@\s]+@[^@\s]+$/.
 
 async function mediaURL(v) {
   if (!v || !isFid(v)) return v || '';
-  const { db } = await import('./db.js');
-  const f = await db.get('files', v).catch(() => null);
-  return f?.blob instanceof Blob ? URL.createObjectURL(f.blob) : '';
+  const { fileObjectURL } = await import('./util.js');
+  return fileObjectURL(v);
 }
 
 function announce(s) {

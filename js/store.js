@@ -9,7 +9,7 @@ export const TYPES = { novel: 'novels', image: 'images', diary: 'diaries', craft
 
 // ---- 設定 ----
 const DEFAULT_SETTINGS = {
-  siteName: '我的作品空間', siteDesc: '', theme: 'literary', avatar: '', cover: '',
+  siteName: '我的作品空間', siteDesc: '', theme: 'parchment', avatar: '', cover: '',
   primaryColor: '', driveClientId: '', demoLoaded: false,
   gasUrl: 'https://script.google.com/macros/s/AKfycbwdpICzohPVFrd0RGz8FDhFUTpOmBuU55O1zwzy6cfi1weIvsGFe4y0YIcgN371_R3BQw/exec',
   driveFolderId: '1OEQ7Cjq6AK6QAeU1CgaxYN0GjdAaIwdF',

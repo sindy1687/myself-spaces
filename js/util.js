@@ -99,7 +99,10 @@ export function modal(html, { onOpen } = {}) {
   const bg = document.createElement('div');
   bg.className = 'modal-bg';
   bg.innerHTML = `<div class="modal" role="dialog" aria-modal="true">${html}</div>`;
-  const close = () => bg.remove();
+  // 按 Esc 關掉最上層的視窗
+  const onKey = e => { if (e.key === 'Escape' && root.lastElementChild === bg) close(); };
+  const close = () => { bg.remove(); removeEventListener('keydown', onKey); };
+  addEventListener('keydown', onKey);
   bg.addEventListener('click', e => { if (e.target === bg) close(); });
   bg.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', close));
   root.appendChild(bg);
@@ -438,10 +441,23 @@ const MISSING_IMG = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http
 const BROKEN_IMG = MISSING_IMG.replace(encodeURIComponent('圖片尚未同步'), encodeURIComponent('圖片無法載入'));
 export const LOCKED_IMG = MISSING_IMG.replace(encodeURIComponent('圖片尚未同步'), encodeURIComponent('🔒 需要密碼'));
 
+// 本機檔案 → blob 網址，同一個檔案只建立一次（同一個 id 的內容不會變）。
+// 以前每次畫面重繪都建新網址又不釋放：記憶體越用越多，圖片也每次都要重新解碼，換頁會越來越卡
+const fileURLs = new Map();
+export async function fileObjectURL(fid) {
+  if (!fid) return '';
+  if (fileURLs.has(fid)) return fileURLs.get(fid);
+  const { db } = await import('./db.js');
+  const f = await db.get('files', fid).catch(e => { console.warn('讀取媒體檔失敗', fid, e); return null; });
+  if (!(f?.blob instanceof Blob)) return '';
+  const url = URL.createObjectURL(f.blob);
+  fileURLs.set(fid, url);
+  return url;
+}
+
 // 把內容中的 data-fid 媒體補上 src（顯示用）
 export async function hydrateMedia(root) {
   (await import('./stickers.js')).hydrateStickers(root);
-  const { db } = await import('./db.js');
   for (const m of root.querySelectorAll('img[src]')) {
     const s = m.getAttribute('src') || '';
     if (isFid(s)) { m.dataset.fid = s; m.removeAttribute('src'); }
@@ -455,18 +471,20 @@ export async function hydrateMedia(root) {
   // 設了密碼、還沒解鎖的圖片，在列表、相簿、拼貼牆等處都只顯示鎖頭
   const { lockedFileIds } = await import('./store.js');
   const locked = await lockedFileIds();
-  for (const m of root.querySelectorAll('[data-fid]')) {
-    if (locked.has(m.dataset.fid)) { m.src = LOCKED_IMG; m.title = '這張圖片有設定密碼'; continue; }
-    if (m.src && !/^blob:/i.test(m.src)) continue;
-    let f = null;
-    try { f = await db.get('files', m.dataset.fid); } catch (e) { console.warn('讀取媒體檔失敗', m.dataset.fid, e); }
-    if (f?.blob instanceof Blob) m.src = URL.createObjectURL(f.blob);
+  // 同時讀取所有圖片（以前一張等一張，圖片多的頁面要等很久）
+  await Promise.all([...root.querySelectorAll('[data-fid]')].map(async m => {
+    if (locked.has(m.dataset.fid)) { m.src = LOCKED_IMG; m.title = '這張圖片有設定密碼'; return; }
+    if (m.src && !/^blob:/i.test(m.src)) return;
+    // 畫面外的圖片捲到附近才解碼，背景解碼不擋住畫面
+    if (m.tagName === 'IMG') { m.decoding = 'async'; if (!m.hasAttribute('loading')) m.loading = 'lazy'; }
+    const url = await fileObjectURL(m.dataset.fid);
+    if (url) { if (m.src !== url) m.src = url; }
     else {
       // 缺檔：顯示佔位圖（不破圖、不破壞版面）
       m.src = MISSING_IMG;
       m.title = '此圖片檔案在本機不存在（可能尚未同步）；請重新上傳或等待雲端載入';
     }
-  }
+  }));
 }
 
 // ---- 裁切視窗：拖曳框身移動到想要的位置、拖四角調大小、可選固定比例 ----

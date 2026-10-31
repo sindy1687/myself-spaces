@@ -2,16 +2,13 @@
 import { list, get, save, trash, listCategories, getSettings, canView, isLocked, canViewAlbum, refreshAlbums, makeLock } from '../store.js';
 import { db } from '../db.js';
 import { applyEdits, validateImage, IMAGE_LIMIT, fitCrop, moveCrop } from '../imgedit.js';
-import { esc, uid, modal, toast, confirmDialog, fmtDate, hydrateMedia, privateNotice, lockNotice, LOCKED_IMG, lockBadge } from '../util.js';
+import { esc, uid, modal, toast, confirmDialog, fmtDate, hydrateMedia, privateNotice, lockNotice, LOCKED_IMG, lockBadge, fileObjectURL } from '../util.js';
 import { shareDialog, countView, catChips, bindCatChips } from './novel.js';
 import { setNav } from './home.js';
 import { isAuthed } from '../auth.js';
 import { selectMode } from '../select-mode.js';
 
-async function fileURL(fileId) {
-  const f = await db.get('files', fileId);
-  return f ? URL.createObjectURL(f.blob) : '';
-}
+const fileURL = fileObjectURL;
 
 // 貼上暫存區：換頁回來仍保留，直到上傳或清除
 const pasteQueue = [];

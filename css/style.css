@@ -437,3 +437,145 @@ body.has-mp.listening .listen-bar{bottom:5.2rem}
 .sync-badge[data-state="pending"],.sync-badge[data-state="syncing"]{color:var(--primary)}
 .sync-badge[data-state="error"]{color:#c0392b;border-color:#c0392b}
 .sync-badge[hidden]{display:none}
+
+/* 市集 */
+.mk-card{display:flex;flex-direction:column;color:var(--text)}
+.mk-card h3{margin:.5rem 0 .2rem}
+.mk-cover{width:100%;aspect-ratio:3/2;object-fit:cover;border-radius:var(--radius);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.mk-blur{filter:blur(4px)}
+.mk-price{font-weight:700;color:var(--primary)}
+.mk-price.free{color:#3a7d44}
+.mk-wallet{padding:.3em .9em;border:1px solid var(--border);border-radius:999px;background:var(--surface);color:var(--text);white-space:nowrap}
+.mk-head{display:flex;gap:1.2rem;flex-wrap:wrap;align-items:flex-start}
+.mk-head .mk-cover{width:220px;max-width:100%;aspect-ratio:auto;max-height:300px}
+.mk-lock{text-align:center;padding:1.6rem;margin-top:1rem;font-size:1.05em}
+.mk-fade{-webkit-mask-image:linear-gradient(#000 60%,transparent);mask-image:linear-gradient(#000 60%,transparent)}
+.mk-foot{position:sticky;bottom:-1.4rem;margin:0 -1.4rem -1.4rem;padding:.4rem 1.4rem 1rem;background:var(--surface);border-top:1px solid var(--border)}
+.mk-foot p{margin:.3rem 0}
+.mk-foot p:empty{display:none}
+
+/* 市集書架：每件作品像一本書（直式封面、左側書脊、右側書頁、陰影，滑過時像翻開） */
+.mk-shelf{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:2.2rem 1.6rem;padding:.4rem .2rem}
+.mk-book{display:block;color:var(--text);min-width:0}
+.mk-book h3{margin:.8rem 0 .15rem;font-size:1rem;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.mk-book .muted{font-size:.85rem}
+.mk-book .mk-meta{font-size:.78rem}
+.bk{position:relative;aspect-ratio:2/3;border-radius:2px 7px 7px 2px;overflow:hidden;background:linear-gradient(150deg,color-mix(in srgb,var(--primary) 85%,#fff),color-mix(in srgb,var(--primary) 70%,#000));box-shadow:inset 0 0 0 1px rgba(0,0,0,.08),2px 3px 4px rgba(0,0,0,.18),8px 12px 22px rgba(0,0,0,.22);transform-origin:left center;transition:transform .35s ease,box-shadow .35s ease}
+.bk img{display:block;width:100%;height:100%;object-fit:cover}
+/* 書脊：左邊一條陰影＋亮線 */
+.bk::before{content:"";position:absolute;inset:0 auto 0 0;width:14px;z-index:2;pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,.38),rgba(0,0,0,.12) 35%,rgba(255,255,255,.28) 50%,rgba(0,0,0,.08) 70%,transparent)}
+/* 書頁：右邊細細的紙張層次 */
+.bk::after{content:"";position:absolute;inset:3px 0 3px auto;width:4px;z-index:2;pointer-events:none;background:repeating-linear-gradient(90deg,rgba(255,255,255,.55) 0 1px,rgba(0,0,0,.08) 1px 2px)}
+.mk-book:hover .bk{transform:perspective(900px) rotateY(-14deg);box-shadow:inset 0 0 0 1px rgba(0,0,0,.08),4px 4px 6px rgba(0,0,0,.2),18px 16px 28px rgba(0,0,0,.28)}
+.bk-plain{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:14% 12% 10% 18%;color:#fff;text-align:center}
+.bk-plain::before{content:"";position:absolute;inset:8px 8px 8px 16px;border:1px solid rgba(255,255,255,.45);pointer-events:none}
+.bk-title{writing-mode:vertical-rl;font-family:"Noto Serif TC",serif;font-size:1.25rem;font-weight:700;letter-spacing:.25em;max-height:75%;overflow:hidden;text-shadow:0 1px 3px rgba(0,0,0,.3)}
+.bk-author{font-size:.75rem;opacity:.85}
+/* 價格書籤：右上角 */
+.bk-tag{position:absolute;top:10px;right:0;z-index:3;padding:.15em .55em .15em .7em;border-radius:999px 0 0 999px;background:rgba(20,16,12,.72);color:#ffe7a8;font-size:.78rem;font-weight:700;backdrop-filter:blur(2px)}
+.bk-tag.free{color:#c9f2c6}
+.bk-tag.owned{color:#fff;background:rgba(58,125,68,.85)}
+/* 圖片：白邊相框，不要書脊 */
+.mk-book.is-image .bk{aspect-ratio:1;border-radius:3px;border:6px solid #fff;background:#fff}
+.mk-book.is-image .bk::before,.mk-book.is-image .bk::after{display:none}
+.mk-book.is-image:hover .bk{transform:translateY(-4px) rotate(-1deg)}
+.mk-head .mk-book{width:180px;flex:none}
+@media(max-width:520px){.mk-shelf{grid-template-columns:repeat(2,minmax(0,1fr));gap:1.6rem 1rem}.mk-head .mk-book{width:140px}}
+
+/* 頁首的點數 */
+.pts-badge{display:inline-flex;align-items:center;margin-left:.8rem;padding:.2em .8em;border:1px solid var(--border);border-radius:999px;background:var(--surface);color:var(--text)!important;font-size:.88rem;font-weight:700;white-space:nowrap;text-shadow:none}
+.pts-badge:hover{border-color:var(--primary)}
+.pts-badge[hidden]{display:none}
+@media(max-width:720px){.pts-badge{margin-left:auto}}
+@media(max-width:720px){.pts-badge:not([hidden])+#nav-toggle{margin-left:.5rem}}
+@media(min-width:721px){#main-nav{flex-wrap:wrap;justify-content:flex-end;row-gap:.2rem}#main-nav a{white-space:nowrap}}
+
+/* 市集書卡：單本／叢書、簡介、卷數書籤 */
+.mk-series{font-size:.82rem;color:var(--primary);font-weight:700;margin:.1rem 0 .15rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mk-desc{font-size:.8rem;color:var(--muted);margin:.3rem 0;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.bk-vol{position:absolute;top:10px;left:10px;z-index:3;padding:.12em .55em;border-radius:3px;background:var(--primary);color:var(--primary-text,#fff);font-size:.75rem;font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+
+/* 市集：讀者留言、唯讀欄位 */
+.mk-cmt{padding:.7rem 0;border-bottom:1px dashed var(--border)}
+.mk-cmt .row{gap:.6rem;align-items:center}
+.mk-cmt p{margin:.3rem 0 0;white-space:pre-wrap;line-height:1.7}
+.mk-cmt-del{margin-left:auto;padding:.1em .6em;font-size:.8rem}
+.mk-author-tag{background:var(--primary);color:var(--primary-text,#fff);border-color:var(--primary);font-size:.72rem;font-weight:700}
+.mk-cmt-form{margin-top:.9rem}
+.mk-ro{background:var(--bg)!important;color:var(--muted)!important;cursor:not-allowed}
+.mk-hint{font-size:.8rem;margin:.25rem 0 .4rem}
+.mk-status{font-size:.72rem;padding:.05em .5em;margin-right:.45em;vertical-align:1px}
+
+/* 電子書封面（首頁精選、小說頁）：書脊那側直角、右側書頁厚度、書脊陰影、封面反光，滑過時像要翻開
+   加 body[data-theme] 提高權重，各範本的圓角設定不會蓋過去 */
+body[data-theme] .feat-cover:not(.wide),.ebook{border-radius:3px 8px 8px 3px;box-shadow:1px 0 0 #fbf8f2,2px 0 0 #d9d1c3,3px 0 0 #f6f1e8,4px 0 0 #d2c9ba,5px 0 0 #f3eee4,6px 1px 0 #cfc5b5,10px 12px 24px rgba(0,0,0,.28);transform-origin:left center;transition:transform .35s ease,box-shadow .35s ease}
+.ebook{position:relative;align-self:flex-start;width:180px;flex:none}
+.ebook img{display:block;width:100%;border-radius:3px 8px 8px 3px}
+body[data-theme] .feat-cover:not(.wide)::before,.ebook::before{content:"";position:absolute;inset:0 auto 0 0;width:16px;z-index:1;pointer-events:none;border-radius:3px 0 0 3px;background:linear-gradient(90deg,rgba(0,0,0,.42),rgba(0,0,0,.12) 35%,rgba(255,255,255,.3) 50%,rgba(0,0,0,.1) 70%,transparent)}
+body[data-theme] .feat-cover:not(.wide)::after,.ebook::after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;border-radius:inherit;background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.14) 48%,transparent 60%)}
+body[data-theme] .feat-slide.on .feat-cover:not(.wide):hover,.ebook:hover{transform:perspective(1000px) rotateY(-10deg);box-shadow:1px 0 0 #fbf8f2,2px 0 0 #d9d1c3,3px 0 0 #f6f1e8,4px 0 0 #d2c9ba,5px 0 0 #f3eee4,6px 1px 0 #cfc5b5,18px 16px 30px rgba(0,0,0,.32)}
+body[data-theme] .feat-slide.on .feat-cover:not(.wide):hover img{transform:none}
+@media(max-width:520px){.ebook{width:140px}}
+
+/* ===== 手機版適配 ===== */
+.pts-short{display:none}
+@media (max-width:720px){
+  /* 頁首：站名一行放不下就用「…」，不要擠成兩行；點數只顯示短字 */
+  .header-inner{gap:.5rem;padding:.55rem .8rem}
+  .brand{flex:1;min-width:0;font-size:1.05rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pts-badge{margin-left:0;padding:.15em .65em;font-size:.82rem}
+  .pts-long{display:none}
+  .pts-short{display:inline}
+  /* 閱讀列：按鈕換行全部看得到（原本擠在一行要橫向滑動才找得到後面的按鈕）；
+     寬度設定在手機上沒有用處就藏起來；不固定在頂端，免得兩排按鈕擋住內文 */
+  .reader-bar{position:static;flex-wrap:wrap;overflow:visible;padding:.4rem;gap:.35rem}
+  .reader-bar>a{flex:1 1 100%;order:-1;overflow:hidden;text-overflow:ellipsis;font-size:.9em}
+  .reader-bar>span.muted{margin-left:0!important}
+  .reader-bar #rw{display:none}
+  .reader-bar :is(button,select){padding:.3em .55em;font-size:.82em}
+  /* 小說頁：電子書封面置中 */
+  #app>.card>.ebook{margin:0 auto}
+  /* 對話框：貼近螢幕邊緣，多一點可用空間 */
+  .modal-bg{padding:.5rem}
+  .modal{padding:1rem;max-height:92vh}
+  .mk-foot{margin:0 -1rem -1rem;padding:.4rem 1rem .8rem;bottom:-1rem}
+}
+@media (max-width:720px){.mk-head .mk-book{margin:0 auto}.mk-head>div:last-child{flex-basis:100%}.mk-head h1{font-size:1.6rem}}
+
+/* 後台表格（作品管理、回收筒）：手機上每一列改成一張小卡片，名稱整行顯示，不會被擠成一行兩個字 */
+@media (max-width:720px){
+  .mtable,.mtable tbody,.mtable tr,.mtable td,.mtable th{display:block}
+  .mtable tr{position:relative;padding:.75rem .2rem .75rem 2.1rem;border-bottom:1px solid var(--border)}
+  .mtable tr:last-child{border-bottom:none}
+  .mtable td,.mtable th{padding:0;border:none;text-align:left}
+  .mtable td:first-child,.mtable th:first-child{position:absolute;left:.2rem;top:.85rem}
+  /* 標題列只留「全選」 */
+  .mtable tr:has(th){padding:.3rem .2rem .5rem 2.1rem;min-height:1.6rem}
+  .mtable tr:has(th) th:not(:first-child){display:none}
+  .mtable tr:has(th)::after{content:"全選";color:var(--muted);font-size:.85rem}
+  .mtable td:nth-child(2){font-weight:700;font-size:1rem;line-height:1.5;word-break:break-word;margin-bottom:.15rem}
+  .mtable td:nth-child(3),.mtable td:nth-child(4),.mtable td:nth-child(5){display:inline;font-size:.82rem;color:var(--muted)}
+  .mtable td:nth-child(3)::after,.mtable td:nth-child(4)::after{content:" ・"}
+  .mtable td.row{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.5rem}
+  .mtable td.row button{padding:.25em .7em;font-size:.82rem;white-space:nowrap}
+}
+
+/* 編輯章節：勾選多章批次刪除、搬移 */
+.ce-bulk{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem .6rem;padding:.5rem .4rem;margin-bottom:.3rem;border-bottom:2px solid var(--border)}
+.ce-all{display:inline-flex;align-items:center;gap:.3em;margin:0;font-weight:700}
+.ce-bulk-btns{display:flex;flex-wrap:wrap;gap:.3rem}
+.ce-bulk-btns button{padding:.25em .65em;font-size:.85em}
+.ce-row{flex-wrap:nowrap}
+.ce-row.ce-on{background:color-mix(in srgb,var(--primary) 10%,transparent)}
+.ce-title{flex:1;min-width:6em}
+.ce-acts{display:flex;gap:.3rem;flex:none}
+.ce-len{white-space:nowrap}
+@media (max-width:720px){
+  /* 手機：章名獨佔一行，看得到完整名稱；按鈕放下一行 */
+  .ce-row{flex-wrap:wrap;gap:.35rem .45rem;padding:.55em .3em}
+  .ce-title{flex:1 1 calc(100% - 5rem);min-width:0}
+  .ce-len{margin-left:auto;font-size:.8em}
+  .ce-acts{flex:1 1 auto;justify-content:flex-end}
+  .ce-acts button,.ce-bulk-btns button{padding:.25em .6em;font-size:.82em}
+  .ce-bulk-btns{flex:1 1 100%}
+}

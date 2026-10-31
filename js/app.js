@@ -33,6 +33,9 @@ const routes = [
   [/^#\/search/, renderSearch],
   [/^#\/admin(?:\/(\w+))?(?:\?.*)?$/, async m => { const { requireAuth } = await import('./auth.js'); if (await requireAuth()) renderAdmin(m[1] || 'works'); }],
   [/^#\/share\/([\w-]+)(?:\/c\/([\w-]+))?$/, m => renderShare(m[1], m[2])],
+  [/^#\/market(?:\?.*)?$/, () => import('./views/market.js').then(v => v.renderMarket())],
+  [/^#\/market\/me$/, () => import('./views/market.js').then(v => v.renderMarketMe())],
+  [/^#\/market\/([\w-]+)$/, m => import('./views/market.js').then(v => v.renderMarketItem(m[1]))],
 ];
 
 export function navigate() {
@@ -80,7 +83,7 @@ async function boot() {
   const preview = new URLSearchParams(location.search).get('preview');
   if (preview) Object.assign(s, { theme: preview, primaryColor: '' });
   const applyTheme = t => {
-    document.body.dataset.theme = t.theme || 'literary';
+    document.body.dataset.theme = t.theme || 'parchment';
     document.body.dataset.deco = t.deco || 'standard';
     document.body.classList.toggle('no-anim', t.anim === false);
     if (t.primaryColor) document.documentElement.style.setProperty('--primary', t.primaryColor);
@@ -100,6 +103,7 @@ async function boot() {
   navigate();
   if (preview) return;
   import('./music.js').then(m => m.initMusic()).catch(e => console.warn('背景音樂', e));
+  import('./points-badge.js').then(m => m.mountPoints()).catch(e => console.warn('點數', e));
   // 多裝置自動同步：不擋首屏；雲端有新資料就套用並刷新畫面，登入後本機一改就自動上傳
   const applied = async () => {
     s2 = await getSettings();

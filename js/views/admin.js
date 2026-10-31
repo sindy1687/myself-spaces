@@ -39,6 +39,30 @@ const THEMES = [
   ['deco', '黑金奢華', '裝飾藝術・黑底金線・扇形紋', '#0e0e0e', '#efe6d0'],
   ['cloud', '雲朵夢境', '天空漸層・雲朵卡片・柔軟圓角', '#cfe8ff', '#34506b'],
   ['retro', '復古電腦', '90 年代視窗・藍色標題列・立體按鈕', '#008080', '#000000'],
+  ['space', '星際旅行', '深紫宇宙・星點・環狀行星', '#0d0b24', '#ece9ff'],
+  ['deepsea', '深海水族', '藍綠漸層・泡泡・圓潤卡片', '#06303f', '#dff7ff'],
+  ['polaroid', '拍立得牆', '軟木板・白邊相片・紅色圖釘', '#c99a63', '#3a2a1c'],
+  ['notebook', '方格筆記', '方格紙・紅色邊線・螢光筆標題', '#fbfbf7', '#24324a'],
+  ['terminal', '駭客終端', '黑底綠字・等寬字・掃描線', '#050805', '#7dff8a'],
+  ['neumorph', '柔霧擬態', '灰白柔光・凸起凹陷的立體感', '#e6e9ef', '#3c4560'],
+  ['holo', '幻彩鐳射', '珍珠白・彩虹漸層邊框・夢幻光澤', '#f7f5fb', '#3a3550'],
+  ['brutal', '新粗獷', '亮黃・粗黑框・硬陰影位移', '#fff3b0', '#000000'],
+  ['swiss', '瑞士網格', '紅黑白・超大標題・細線網格', '#f4f4f0', '#111111'],
+  ['xmas', '聖誕小屋', '紅綠配色・飄雪・金色星星', '#fbf6ef', '#3b2420'],
+  ['halloween', '萬聖夜', '紫黑夜空・南瓜橘・月亮蝙蝠', '#1b1226', '#f4e9ff'],
+  ['autumn', '楓紅秋日', '暖橙酒紅・楓葉・溫暖紙感', '#f8ecdc', '#4a2618'],
+  ['winter', '冬日雪國', '冰藍・雪花・霜白卡片', '#eef5fb', '#23384d'],
+  ['tropical', '熱帶度假', '湖水綠・珊瑚粉・夕陽海灘', '#fff8ef', '#1f3d3a'],
+  ['redwall', '中式紅牆', '朱紅・金色框線・窗花圓框', '#f8efe1', '#3a1a12'],
+  ['porcelain', '青花瓷', '白瓷底・鈷藍雙線・花紋圓盤', '#f7f9fc', '#16294d'],
+  ['steampunk', '蒸汽齒輪', '黃銅・深棕皮革・鉚釘齒輪', '#2a1d14', '#f1dfc0'],
+  ['gingham', '野餐格紋', '紅白格子・草地綠・虛線縫邊', '#fffdf8', '#3b2a24'],
+  ['latte', '午後拿鐵', '奶泡米・焦糖棕・咖啡杯印', '#f3eadf', '#3e2b20'],
+  ['y2k', '千禧亮片', 'Y2K 粉藍・鉻銀頁首・星星', '#fde7ff', '#3a1d5a'],
+  ['vapor', '蒸氣波', '粉紫夕陽・透視網格・雙色殘影', '#2b1452', '#ffe9fb'],
+  ['origami', '摺紙', '多彩紙片・摺角卡片・斜切橫幅', '#f2efe9', '#2d2a26'],
+  ['stained', '彩繪玻璃', '黑色鉛條・寶石色塊・拱窗', '#1a1a22', '#f4efe6'],
+  ['sketch', '鉛筆素描', '素描紙・手繪歪斜框線・螢光筆', '#fafaf7', '#2b2b2b'],
 ];
 
 export async function renderAdmin(tab) {
@@ -159,7 +183,7 @@ async function works(body) {
     </div>
     <div class="w-bar row hidden" id="w-bar"><b id="w-count"></b>
       <button id="w-del" class="danger">🗑 刪除所選</button><button id="w-pub">設為公開</button><button id="w-priv">設為私人</button><button id="w-lock">🔒 設定密碼</button><button id="w-unlock">移除密碼</button><button id="w-none">取消選取</button></div>
-    <div class="card"><table><tr><th><input type="checkbox" id="w-all" aria-label="全選目前列出的作品" style="width:auto"></th><th>作品</th><th>類型</th><th>更新</th><th>隱私</th><th></th></tr>
+    <div class="card"><table class="mtable"><tr><th><input type="checkbox" id="w-all" aria-label="全選目前列出的作品" style="width:auto"></th><th>作品</th><th>類型</th><th>更新</th><th>隱私</th><th></th></tr>
     ${all.map(([t, it]) => row(t, it)).join('')}
     </table><p class="muted hidden" id="w-empty" style="text-align:center">沒有符合的作品</p></div>`;
   document.getElementById('rm-demo').onclick = async () => {
@@ -720,7 +744,7 @@ async function trashTab(body) {
   body.innerHTML = items.length ? `
     <div class="row" style="margin-bottom:.6rem"><span class="muted">共 ${items.length} 件</span><span style="margin-left:auto"></span><button id="tr-empty" class="danger">清空回收筒</button></div>
     <div class="w-bar row hidden" id="tr-bar"><b id="tr-count"></b><button id="tr-res">↩ 還原所選</button><button id="tr-pur" class="danger">永久刪除所選</button></div>
-    <div class="card"><table><tr><th><input type="checkbox" id="tr-all" aria-label="全選" style="width:auto"></th><th>項目</th><th>類型</th><th>刪除時間</th><th></th></tr>
+    <div class="card"><table class="mtable"><tr><th><input type="checkbox" id="tr-all" aria-label="全選" style="width:auto"></th><th>項目</th><th>類型</th><th>刪除時間</th><th></th></tr>
     ${items.map(t => `<tr data-k="${t.id}"><td><input type="checkbox" class="tr-sel" aria-label="選取「${esc(t.title)}」" style="width:auto"></td><td>${esc(t.title)}</td><td>${TYPE_NAME[t.type] || esc(t.type)}</td><td class="muted">${new Date(t.deletedAt).toLocaleString('zh-TW')}</td>
     <td class="row"><button data-res="${t.id}">還原</button><button data-pur="${t.id}" class="danger">永久刪除</button></td></tr>`).join('')}</table></div>`
     : '<div class="empty">回收筒是空的</div>';

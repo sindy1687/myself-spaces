@@ -624,3 +624,387 @@ body[data-theme="retro"] .muted{color:#3a3a3a}
 .theme-shot{position:relative;height:190px;border-radius:8px;border:1px solid var(--border);overflow:hidden;background:var(--bg)}
 .theme-shot iframe{position:absolute;top:0;left:0;width:1200px;height:760px;border:0;transform:scale(.25);transform-origin:0 0;pointer-events:none}
 @media(min-width:900px){.theme-shot iframe{transform:scale(.3)}.theme-shot{height:228px}}
+
+
+/* ===== 第三批 24 套範本 ===== */
+
+/* ---------- 星際旅行：深紫宇宙、星點、環狀行星 ---------- */
+body[data-theme="space"]{--bg:#0d0b24;--surface:#17143a;--text:#ece9ff;--muted:#a49fd0;--primary:#ffb347;--primary-text:#0d0b24;--border:#2d2866;--accent:#7f6bff;--radius:14px;font-family:"Space Grotesk","Noto Sans TC",sans-serif;background:radial-gradient(1px 1px at 10% 20%,#fff,transparent),radial-gradient(1px 1px at 30% 70%,#fff,transparent),radial-gradient(1.5px 1.5px at 55% 35%,#fff,transparent),radial-gradient(1px 1px at 75% 80%,#fff,transparent),radial-gradient(1.5px 1.5px at 90% 15%,#fff,transparent),#0d0b24;background-size:300px 300px;background-attachment:fixed}
+body[data-theme="space"]::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(circle at 80% 110%,rgba(127,107,255,.35),transparent 50%)}
+body[data-theme="space"] #site-header{background:rgba(13,11,36,.85);backdrop-filter:blur(8px);border-bottom:1px solid #2d2866}
+body[data-theme="space"] .brand{color:#ffb347}
+body[data-theme="space"] .brand::before{content:"🪐 "}
+body[data-theme="space"] .card{border:1px solid #2d2866;box-shadow:0 0 0 1px rgba(127,107,255,.15),0 10px 30px rgba(0,0,0,.4)}
+body[data-theme="space"] .grid>.card:hover{transform:translateY(-4px);box-shadow:0 0 22px rgba(127,107,255,.45)}
+body[data-theme="space"] .section-title{border-left-color:#7f6bff}
+body[data-theme="space"] .section-title::before{content:"✦ ";color:#ffb347}
+body[data-theme="space"] button.primary{background:linear-gradient(135deg,#ffb347,#ff7e5f);border:none}
+body[data-theme="space"] .hero{border-radius:20px;background:radial-gradient(circle at 88% 30%,#ffb347 0 30px,transparent 31px),linear-gradient(160deg,#211c5a,#0d0b24);border:1px solid #2d2866}
+body[data-theme="space"] .empty::before{content:"🚀";display:block;font-size:2.4rem;opacity:.6}
+
+/* ---------- 深海水族：藍綠漸層、泡泡、圓潤卡片 ---------- */
+body[data-theme="deepsea"]{--bg:#06303f;--surface:#0b4256;--text:#dff7ff;--muted:#8fc3d3;--primary:#3fe0c5;--primary-text:#06303f;--border:#14607a;--accent:#ff9f80;--radius:18px;font-family:"Noto Sans TC",sans-serif;background:linear-gradient(180deg,#0a5a73 0%,#06303f 55%,#031c26 100%) fixed}
+body[data-theme="deepsea"]::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(circle at 12% 80%,rgba(255,255,255,.18) 0 6px,transparent 7px),radial-gradient(circle at 15% 70%,rgba(255,255,255,.14) 0 4px,transparent 5px),radial-gradient(circle at 88% 60%,rgba(255,255,255,.16) 0 8px,transparent 9px),radial-gradient(circle at 90% 48%,rgba(255,255,255,.12) 0 5px,transparent 6px),radial-gradient(circle at 50% 90%,rgba(255,255,255,.1) 0 10px,transparent 11px)}
+body[data-theme="deepsea"] #site-header{background:rgba(6,48,63,.8);backdrop-filter:blur(8px);border-bottom:none;box-shadow:0 2px 20px rgba(0,0,0,.3)}
+body[data-theme="deepsea"] .brand{color:#3fe0c5}
+body[data-theme="deepsea"] .brand::before{content:"🐠 "}
+body[data-theme="deepsea"] .card{border:1px solid rgba(63,224,197,.2);background:rgba(11,66,86,.75)}
+body[data-theme="deepsea"] .grid>.card:hover{transform:translateY(-5px);border-color:#3fe0c5}
+body[data-theme="deepsea"] .section-title{border:none;padding:0}
+body[data-theme="deepsea"] .section-title::before{content:"〰 ";color:#3fe0c5}
+body[data-theme="deepsea"] button{border-radius:999px}
+body[data-theme="deepsea"] .hero{border-radius:30px;background:radial-gradient(ellipse at 50% -20%,rgba(63,224,197,.35),transparent 60%),#0b4256;border:1px solid #14607a}
+body[data-theme="deepsea"] .empty::before{content:"🫧";display:block;font-size:2.4rem;opacity:.6}
+
+/* ---------- 拍立得牆：軟木板、白邊拍立得、圖釘 ---------- */
+body[data-theme="polaroid"]{--bg:#c99a63;--surface:#fffefa;--text:#3a2a1c;--muted:#8a7360;--primary:#d9453b;--primary-text:#fff;--border:#e8dccb;--accent:#2f7fb8;--radius:2px;font-family:"LXGW WenKai TC","Noto Sans TC",sans-serif;background:radial-gradient(circle at 20% 30%,rgba(0,0,0,.08) 1px,transparent 2px) 0 0/9px 9px,radial-gradient(circle at 70% 60%,rgba(255,255,255,.08) 1px,transparent 2px) 0 0/13px 13px,#c99a63}
+body[data-theme="polaroid"] #site-header{background:#fffefa;border-bottom:6px solid #8a5f33}
+body[data-theme="polaroid"] .brand::before{content:"📸 "}
+body[data-theme="polaroid"] .card{border:none;box-shadow:0 6px 14px rgba(60,35,10,.35)}
+body[data-theme="polaroid"] .grid>.card{position:relative;padding-bottom:1.8rem}
+body[data-theme="polaroid"] .grid>.card:nth-child(odd){transform:rotate(-1.5deg)}
+body[data-theme="polaroid"] .grid>.card:nth-child(even){transform:rotate(1.2deg)}
+body[data-theme="polaroid"] .grid>.card::before{content:"";position:absolute;top:-7px;left:50%;width:14px;height:14px;margin-left:-7px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#ff8a80,#c62828);box-shadow:0 2px 3px rgba(0,0,0,.4)}
+body[data-theme="polaroid"] .grid>.card:hover{transform:rotate(0) scale(1.03);z-index:2}
+body[data-theme="polaroid"] .section-title{display:inline-block;border:none;background:#fffefa;padding:.2em .8em;transform:rotate(-1deg);box-shadow:0 3px 8px rgba(0,0,0,.25)}
+body[data-theme="polaroid"] .hero{background:#fffefa;padding:2rem 1rem 3rem;box-shadow:0 8px 18px rgba(60,35,10,.35);transform:rotate(-.6deg)}
+body[data-theme="polaroid"] .empty{color:#fffefa}
+body[data-theme="polaroid"] .empty::before{content:"📌";display:block;font-size:2.4rem;opacity:.8}
+
+/* ---------- 方格筆記：方格紙、紅色邊線、活頁孔 ---------- */
+body[data-theme="notebook"]{--bg:#fbfbf7;--surface:#ffffff;--text:#24324a;--muted:#7b8699;--primary:#2e5bba;--primary-text:#fff;--border:#d5deea;--accent:#e05a5a;--radius:3px;font-family:"LXGW WenKai TC","Noto Sans TC",sans-serif;background:linear-gradient(90deg,transparent 58px,rgba(224,90,90,.5) 58px 60px,transparent 60px) 0 0/100% 100%,linear-gradient(rgba(46,91,186,.09) 1px,transparent 1px) 0 0/22px 22px,linear-gradient(90deg,rgba(46,91,186,.09) 1px,transparent 1px) 0 0/22px 22px,#fbfbf7;background-attachment:fixed}
+body[data-theme="notebook"]::before{content:"";position:fixed;left:16px;top:0;bottom:0;width:18px;z-index:-1;pointer-events:none;background:radial-gradient(circle at 9px 9px,#d9d9d0 0 8px,transparent 9px) 0 0/18px 90px repeat-y}
+body[data-theme="notebook"] #site-header{background:#fff;border-bottom:2px solid #2e5bba}
+body[data-theme="notebook"] .brand{color:#2e5bba}
+body[data-theme="notebook"] .brand::before{content:"✏️ "}
+body[data-theme="notebook"] .card{border:1px solid #d5deea;box-shadow:2px 2px 0 #d5deea}
+body[data-theme="notebook"] .grid>.card:hover{box-shadow:4px 4px 0 #2e5bba}
+body[data-theme="notebook"] .section-title{border:none;padding:0;background:linear-gradient(transparent 60%,rgba(255,226,92,.7) 60%);display:inline-block}
+body[data-theme="notebook"] .hero{border:2px dashed #2e5bba;background:rgba(255,255,255,.7)}
+body[data-theme="notebook"] .empty::before{content:"📓";display:block;font-size:2.4rem;opacity:.6}
+
+/* ---------- 駭客終端：黑底綠字、等寬字、掃描線 ---------- */
+body[data-theme="terminal"]{--bg:#050805;--surface:#0b120b;--text:#7dff8a;--muted:#3fa34a;--primary:#7dff8a;--primary-text:#050805;--border:#1d3a20;--accent:#ffd35c;--radius:0;--shadow:none;font-family:"Space Mono","Noto Sans TC",monospace}
+body[data-theme="terminal"]::after{content:"";position:fixed;inset:0;z-index:999;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.18) 0 1px,transparent 1px 3px)}
+body[data-theme="terminal"] #site-header{background:#050805;border-bottom:1px dashed #3fa34a}
+body[data-theme="terminal"] .brand::before{content:"> "}
+body[data-theme="terminal"] .brand::after{content:"_";animation:term-blink 1s steps(1) infinite}
+@keyframes term-blink{50%{opacity:0}}
+body[data-theme="terminal"] #main-nav a::before{content:"./"}
+body[data-theme="terminal"] .card{border:1px solid #1d3a20}
+body[data-theme="terminal"] .grid>.card:hover{border-color:#7dff8a;box-shadow:0 0 12px rgba(125,255,138,.3)}
+body[data-theme="terminal"] :is(h1,h2,h3){text-shadow:0 0 6px rgba(125,255,138,.5)}
+body[data-theme="terminal"] .section-title{border:none;padding:0}
+body[data-theme="terminal"] .section-title::before{content:"$ ";color:#ffd35c}
+body[data-theme="terminal"] button{background:transparent;color:#7dff8a;border-color:#3fa34a}
+body[data-theme="terminal"] button.primary{background:#7dff8a;color:#050805}
+body[data-theme="terminal"] .hero{border:1px solid #3fa34a;text-align:left}
+body[data-theme="terminal"] .hero h1::before{content:"~# "}
+body[data-theme="terminal"] .empty::before{content:"[ empty ]";display:block;font-size:1.4rem;opacity:.6}
+
+/* ---------- 柔霧擬態：灰白底、凸起與凹陷的柔光陰影 ---------- */
+body[data-theme="neumorph"]{--bg:#e6e9ef;--surface:#e6e9ef;--text:#3c4560;--muted:#8890a6;--primary:#6c7fd8;--primary-text:#fff;--border:#d3d7e0;--accent:#e98fa6;--radius:20px;font-family:"Noto Sans TC",sans-serif}
+body[data-theme="neumorph"] #site-header{background:#e6e9ef;border:none;box-shadow:0 6px 14px #c8ccd5}
+body[data-theme="neumorph"] .brand{color:#6c7fd8}
+body[data-theme="neumorph"] .card{border:none;box-shadow:9px 9px 18px #c3c7d0,-9px -9px 18px #ffffff}
+body[data-theme="neumorph"] .grid>.card:hover{box-shadow:inset 6px 6px 12px #c3c7d0,inset -6px -6px 12px #ffffff}
+body[data-theme="neumorph"] :is(button,.album-chip){border:none;border-radius:14px;box-shadow:5px 5px 10px #c3c7d0,-5px -5px 10px #ffffff}
+body[data-theme="neumorph"] :is(button:active,.album-chip.on){box-shadow:inset 4px 4px 8px #c3c7d0,inset -4px -4px 8px #ffffff}
+body[data-theme="neumorph"] button.primary{color:#6c7fd8;background:#e6e9ef;font-weight:700}
+body[data-theme="neumorph"] :is(input,select,textarea){border:none;box-shadow:inset 4px 4px 8px #c3c7d0,inset -4px -4px 8px #ffffff}
+body[data-theme="neumorph"] .section-title{border:none;padding:0;color:#6c7fd8}
+body[data-theme="neumorph"] .hero{border-radius:32px;box-shadow:inset 10px 10px 20px #c3c7d0,inset -10px -10px 20px #ffffff}
+body[data-theme="neumorph"] .empty::before{content:"◯";display:block;font-size:2.4rem;opacity:.5}
+
+/* ---------- 幻彩鐳射：珍珠白、流動彩虹光澤、漸層邊框 ---------- */
+body[data-theme="holo"]{--bg:#f7f5fb;--surface:#ffffff;--text:#3a3550;--muted:#8a84a3;--primary:#9b6dff;--primary-text:#fff;--border:#e6e0f5;--accent:#5fd3e8;--radius:22px;font-family:"Space Grotesk","Noto Sans TC",sans-serif;background:linear-gradient(120deg,#fde2f3,#e0ecff 30%,#dffcf1 55%,#fff6d9 80%,#f3e1ff) fixed}
+body[data-theme="holo"] #site-header{background:rgba(255,255,255,.6);backdrop-filter:blur(14px);border-bottom:1px solid rgba(255,255,255,.8)}
+body[data-theme="holo"] .brand{color:#9b6dff;text-shadow:1px 1px 0 #ff9ad5,-1px -1px 0 #7fe3f0}
+body[data-theme="holo"] .brand::before{content:"✨ "}
+body[data-theme="holo"] .card{border:2px solid transparent;background:linear-gradient(rgba(255,255,255,.85),rgba(255,255,255,.85)) padding-box,linear-gradient(120deg,#ff9ad5,#b69bff,#7fe3f0,#ffe58a) border-box}
+body[data-theme="holo"] .grid>.card:hover{transform:translateY(-5px);box-shadow:0 14px 30px rgba(155,109,255,.25)}
+body[data-theme="holo"] .section-title{border:none;padding:0}
+body[data-theme="holo"] .section-title::before{content:"✦ ";color:#9b6dff}
+body[data-theme="holo"] button{border-radius:999px}
+body[data-theme="holo"] button.primary{background:linear-gradient(120deg,#ff7ac6,#9b6dff,#5fd3e8);border:none}
+body[data-theme="holo"] .hero{border-radius:36px;background:linear-gradient(120deg,rgba(255,154,213,.5),rgba(182,155,255,.5),rgba(127,227,240,.5),rgba(255,229,138,.5));border:2px solid #fff}
+body[data-theme="holo"] .empty::before{content:"💿";display:block;font-size:2.4rem;opacity:.6}
+
+/* ---------- 新粗獷：亮黃、粗黑框、硬陰影位移 ---------- */
+body[data-theme="brutal"]{--bg:#fff3b0;--surface:#ffffff;--text:#000000;--muted:#444;--primary:#ff5c8a;--primary-text:#000;--border:#000;--accent:#4dd0ff;--radius:0;font-family:"Space Grotesk","Noto Sans TC",sans-serif}
+body[data-theme="brutal"] #site-header{background:#4dd0ff;border-bottom:3px solid #000}
+body[data-theme="brutal"] .brand{font-weight:900;background:#fff;border:3px solid #000;padding:0 .4em;box-shadow:4px 4px 0 #000}
+body[data-theme="brutal"] #main-nav a{font-weight:700}
+body[data-theme="brutal"] .card{border:3px solid #000;box-shadow:6px 6px 0 #000}
+body[data-theme="brutal"] .grid>.card:hover{transform:translate(-3px,-3px);box-shadow:9px 9px 0 #000}
+body[data-theme="brutal"] :is(button,input,select,textarea,.tag,.album-chip){border:2px solid #000;border-radius:0}
+body[data-theme="brutal"] button{box-shadow:3px 3px 0 #000;font-weight:700}
+body[data-theme="brutal"] button:active{transform:translate(3px,3px);box-shadow:none}
+body[data-theme="brutal"] .section-title{display:inline-block;border:3px solid #000;background:#ff5c8a;padding:.1em .6em;box-shadow:4px 4px 0 #000}
+body[data-theme="brutal"] .hero{background:#ff5c8a;border:3px solid #000;box-shadow:8px 8px 0 #000}
+body[data-theme="brutal"] .hero h1{font-size:2.6rem;font-weight:900}
+body[data-theme="brutal"] .empty::before{content:"■";display:block;font-size:2.4rem}
+
+/* ---------- 瑞士網格：國際主義、紅黑白、超大標題、細線網格 ---------- */
+body[data-theme="swiss"]{--bg:#f4f4f0;--surface:#ffffff;--text:#111;--muted:#666;--primary:#e3201b;--primary-text:#fff;--border:#111;--accent:#111;--radius:0;--shadow:none;font-family:"Helvetica Neue",Arial,"Noto Sans TC",sans-serif;background:linear-gradient(90deg,rgba(0,0,0,.05) 1px,transparent 1px) 0 0/8.333% 100%,#f4f4f0}
+body[data-theme="swiss"] #site-header{background:#f4f4f0;border-bottom:4px solid #111}
+body[data-theme="swiss"] .brand{font-weight:900;letter-spacing:-.03em;font-size:1.6rem}
+body[data-theme="swiss"] .brand::before{content:"";display:inline-block;width:.7em;height:.7em;background:#e3201b;margin-right:.3em}
+body[data-theme="swiss"] #main-nav a{font-weight:700}
+body[data-theme="swiss"] #main-nav a.active{color:#e3201b}
+body[data-theme="swiss"] .card{border:none;border-top:4px solid #111}
+body[data-theme="swiss"] .grid>.card:hover{border-top-color:#e3201b}
+body[data-theme="swiss"] .section-title{border:none;padding:0;font-size:2.2rem;font-weight:900;letter-spacing:-.03em}
+body[data-theme="swiss"] .section-title::after{content:".";color:#e3201b}
+body[data-theme="swiss"] .hero{text-align:left;background:#e3201b;padding:3.5rem 2rem}
+body[data-theme="swiss"] .hero :is(h1,p,.muted){color:#fff}
+body[data-theme="swiss"] .hero h1{font-size:3.2rem;font-weight:900;letter-spacing:-.04em;line-height:1.1}
+body[data-theme="swiss"] .empty::before{content:"—";display:block;font-size:2.4rem}
+
+/* ---------- 聖誕小屋：紅綠配色、飄雪、金色星星 ---------- */
+body[data-theme="xmas"]{--bg:#fbf6ef;--surface:#ffffff;--text:#3b2420;--muted:#94766d;--primary:#c0392b;--primary-text:#fff;--border:#ecd9cc;--accent:#2e7d4f;--radius:12px;font-family:"Noto Serif TC",serif}
+/* 飄雪用 transform 移動整層（交給顯示卡，不必每格重畫）；400px 是兩種雪花間距 80、50 的公倍數，接縫看不出來 */
+body[data-theme="xmas"]::before{content:"";position:fixed;left:0;right:0;top:-400px;bottom:0;z-index:-1;pointer-events:none;background-image:radial-gradient(circle,#c9dbe9 2px,transparent 3px),radial-gradient(circle,#d9e6f0 1.5px,transparent 2.5px);background-size:80px 80px,50px 50px;background-position:0 0,25px 30px;will-change:transform;animation:snowfall 18s linear infinite}
+@keyframes snowfall{to{transform:translateY(400px)}}
+body.no-anim[data-theme="xmas"]::before{animation:none}
+body[data-theme="xmas"] #site-header{background:#2e7d4f;border-bottom:6px solid #c0392b}
+body[data-theme="xmas"] :is(.brand,#main-nav a){color:#fff}
+body[data-theme="xmas"] .brand::before{content:"🎄 "}
+body[data-theme="xmas"] .card{border:2px solid #ecd9cc}
+body[data-theme="xmas"] .grid>.card{border-top:6px solid #c0392b}
+body[data-theme="xmas"] .grid>.card:nth-child(even){border-top-color:#2e7d4f}
+body[data-theme="xmas"] .grid>.card:hover{transform:translateY(-4px)}
+body[data-theme="xmas"] .section-title{border:none;padding:0;color:#c0392b}
+body[data-theme="xmas"] .section-title::before{content:"⭐ "}
+body[data-theme="xmas"] .hero{background:repeating-linear-gradient(45deg,#c0392b 0 14px,#fff 14px 28px) top/100% 10px no-repeat,#fff;border:2px solid #ecd9cc;padding-top:3.4rem}
+body[data-theme="xmas"] .hero h1{color:#2e7d4f}
+body[data-theme="xmas"] .empty::before{content:"🎁";display:block;font-size:2.4rem;opacity:.7}
+
+/* ---------- 萬聖夜：紫黑夜空、南瓜橘、月亮蝙蝠 ---------- */
+body[data-theme="halloween"]{--bg:#1b1226;--surface:#271a36;--text:#f4e9ff;--muted:#a993bd;--primary:#ff8a1f;--primary-text:#1b1226;--border:#3f2b55;--accent:#8bdc5b;--radius:10px;font-family:"Noto Sans TC",sans-serif;background:radial-gradient(circle at 85% 12%,#ffe9a8 0 40px,rgba(255,233,168,.2) 41px 60px,transparent 61px),linear-gradient(180deg,#2b1a3d,#1b1226 60%);background-attachment:fixed}
+body[data-theme="halloween"] :is(h1,h2,h3,.brand){font-family:"Bangers","Noto Sans TC",sans-serif;letter-spacing:.04em}
+body[data-theme="halloween"] #site-header{background:#120b1a;border-bottom:3px solid #ff8a1f}
+body[data-theme="halloween"] .brand{color:#ff8a1f}
+body[data-theme="halloween"] .brand::before{content:"🎃 "}
+body[data-theme="halloween"] .card{border:1px solid #3f2b55}
+body[data-theme="halloween"] .grid>.card:hover{transform:translateY(-4px) rotate(-.5deg);box-shadow:0 0 18px rgba(255,138,31,.35)}
+body[data-theme="halloween"] .section-title{border:none;padding:0;color:#ff8a1f}
+body[data-theme="halloween"] .section-title::before{content:"🦇 "}
+body[data-theme="halloween"] button.primary{background:#ff8a1f;border-color:#ff8a1f}
+body[data-theme="halloween"] .hero{background:linear-gradient(160deg,#3f2b55,#271a36);border:2px solid #ff8a1f;border-radius:16px}
+body[data-theme="halloween"] .hero h1{color:#ff8a1f;font-size:2.6rem}
+body[data-theme="halloween"] .empty::before{content:"👻";display:block;font-size:2.4rem;opacity:.7}
+
+/* ---------- 楓紅秋日：暖橙酒紅、楓葉、溫暖紙感 ---------- */
+body[data-theme="autumn"]{--bg:#f8ecdc;--surface:#fffaf2;--text:#4a2618;--muted:#9a6c56;--primary:#b8431f;--primary-text:#fff;--border:#ecd2b8;--accent:#d9952b;--radius:10px;font-family:"Noto Serif TC",serif;background:radial-gradient(circle at 0 0,rgba(184,67,31,.12),transparent 35%),radial-gradient(circle at 100% 100%,rgba(217,149,43,.15),transparent 40%),#f8ecdc;background-attachment:fixed}
+body[data-theme="autumn"] #site-header{background:linear-gradient(90deg,#8e2f17,#b8431f,#d9952b);border:none}
+body[data-theme="autumn"] :is(.brand,#main-nav a){color:#fff6ea}
+body[data-theme="autumn"] .brand::before{content:"🍁 "}
+body[data-theme="autumn"] .card{border:1px solid #ecd2b8;box-shadow:0 4px 12px rgba(142,47,23,.1)}
+body[data-theme="autumn"] .grid>.card:hover{transform:translateY(-4px);border-color:#d9952b}
+body[data-theme="autumn"] .section-title{border-left-color:#d9952b;color:#8e2f17}
+body[data-theme="autumn"] .section-title::after{content:" 🍂";font-size:.8em}
+body[data-theme="autumn"] .hero{background:linear-gradient(135deg,#fff3e2,#f6d9b8);border-radius:18px;border:1px solid #ecd2b8}
+body[data-theme="autumn"] .hero h1{color:#8e2f17}
+body[data-theme="autumn"] .empty::before{content:"🍂";display:block;font-size:2.4rem;opacity:.6}
+
+/* ---------- 冬日雪國：冰藍、雪花、霜白卡片 ---------- */
+body[data-theme="winter"]{--bg:#eef5fb;--surface:#ffffff;--text:#23384d;--muted:#7d93a8;--primary:#3b7dc4;--primary-text:#fff;--border:#d7e6f3;--accent:#9fd3f0;--radius:14px;font-family:"Noto Sans TC",sans-serif;background:linear-gradient(180deg,#dcecf9,#f6fafd 50%) fixed}
+body[data-theme="winter"]::before{content:"❄";position:fixed;right:4vw;bottom:2vh;z-index:-1;pointer-events:none;font-size:22rem;line-height:1;color:rgba(59,125,196,.06)}
+body[data-theme="winter"]::after{content:"❅";position:fixed;left:3vw;top:18vh;z-index:-1;pointer-events:none;font-size:10rem;line-height:1;color:rgba(59,125,196,.06)}
+body[data-theme="winter"] #site-header{background:rgba(255,255,255,.85);backdrop-filter:blur(8px);border-bottom:2px solid #d7e6f3}
+body[data-theme="winter"] .brand{color:#3b7dc4}
+body[data-theme="winter"] .brand::before{content:"❄ "}
+body[data-theme="winter"] .card{border:1px solid #d7e6f3;box-shadow:0 6px 18px rgba(59,125,196,.1)}
+body[data-theme="winter"] .grid>.card:hover{transform:translateY(-4px);box-shadow:0 10px 24px rgba(59,125,196,.2)}
+body[data-theme="winter"] .section-title{border:none;padding:0;color:#3b7dc4}
+body[data-theme="winter"] .section-title::before{content:"❅ "}
+body[data-theme="winter"] button{border-radius:999px}
+body[data-theme="winter"] .hero{background:linear-gradient(180deg,#fff,#e4f0fa);border-radius:24px;border:1px solid #d7e6f3;box-shadow:inset 0 -12px 0 #fff}
+body[data-theme="winter"] .empty::before{content:"⛄";display:block;font-size:2.4rem;opacity:.7}
+
+/* ---------- 熱帶度假：湖水綠頁首、珊瑚粉、夕陽海灘橫幅 ---------- */
+body[data-theme="tropical"]{--bg:#fff8ef;--surface:#ffffff;--text:#1f3d3a;--muted:#6f8f8a;--primary:#ff6f61;--primary-text:#fff;--border:#f5e1cf;--accent:#14a39a;--radius:18px;font-family:"Noto Sans TC",sans-serif;background:radial-gradient(ellipse at 0 0,rgba(20,163,154,.18),transparent 40%),radial-gradient(ellipse at 100% 0,rgba(255,111,97,.15),transparent 40%),#fff8ef;background-attachment:fixed}
+body[data-theme="tropical"] :is(h1,h2,h3,.brand){font-family:"Righteous","Noto Sans TC",sans-serif}
+body[data-theme="tropical"] #site-header{background:#14a39a;border-bottom:none;box-shadow:0 6px 0 #ffc857}
+body[data-theme="tropical"] :is(.brand,#main-nav a){color:#fff}
+body[data-theme="tropical"] .brand::before{content:"🌴 "}
+body[data-theme="tropical"] main{padding-top:1.4rem}
+body[data-theme="tropical"] .card{border:none;box-shadow:0 8px 20px rgba(20,163,154,.15)}
+body[data-theme="tropical"] .grid>.card:hover{transform:translateY(-5px) rotate(-.6deg)}
+body[data-theme="tropical"] .section-title{border:none;padding:0;color:#14a39a}
+body[data-theme="tropical"] .section-title::before{content:"🌺 "}
+body[data-theme="tropical"] button{border-radius:999px}
+body[data-theme="tropical"] .hero{background:linear-gradient(180deg,#ffc857 0 30%,#ff9a76 30% 55%,#14a39a 55%);border-radius:28px}
+body[data-theme="tropical"] .hero :is(h1,p,.muted){color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.25)}
+body[data-theme="tropical"] .empty::before{content:"🍹";display:block;font-size:2.4rem;opacity:.7}
+
+/* ---------- 中式紅牆：朱紅、金色框線、窗花圓框橫幅 ---------- */
+body[data-theme="redwall"]{--bg:#f8efe1;--surface:#fffaf1;--text:#3a1a12;--muted:#8f6a55;--primary:#b3261e;--primary-text:#fff6e0;--border:#e7d2b4;--accent:#c9a04a;--radius:4px;font-family:"Noto Serif TC",serif}
+body[data-theme="redwall"] #site-header{background:#b3261e;border-bottom:4px solid #c9a04a}
+body[data-theme="redwall"] :is(.brand,#main-nav a){color:#fff1d0}
+body[data-theme="redwall"] .brand{letter-spacing:.3em}
+body[data-theme="redwall"] .brand::before{content:"🏮 "}
+body[data-theme="redwall"] .card{border:1px solid #c9a04a;outline:3px double rgba(179,38,30,.35);outline-offset:-7px}
+body[data-theme="redwall"] .grid>.card:hover{background:#fff4e2}
+body[data-theme="redwall"] .section-title{border:none;padding:0;text-align:center;color:#b3261e;letter-spacing:.3em}
+body[data-theme="redwall"] .section-title::before{content:"〔 "}
+body[data-theme="redwall"] .section-title::after{content:" 〕"}
+body[data-theme="redwall"] button.primary{background:#b3261e;border-color:#c9a04a}
+body[data-theme="redwall"] .hero{background:radial-gradient(circle,#fffaf1 0 42%,transparent 42.5%),repeating-linear-gradient(45deg,#c9a04a 0 2px,transparent 2px 12px),#b3261e;padding:4rem 1rem;border:4px solid #c9a04a}
+body[data-theme="redwall"] .hero h1{color:#b3261e;letter-spacing:.2em}
+body[data-theme="redwall"] .empty::before{content:"🧧";display:block;font-size:2.4rem;opacity:.7}
+
+/* ---------- 青花瓷：白瓷底、鈷藍雙線、放射花紋圓盤 ---------- */
+body[data-theme="porcelain"]{--bg:#f7f9fc;--surface:#ffffff;--text:#16294d;--muted:#6a7c9e;--primary:#1f4aa8;--primary-text:#fff;--border:#d3ddef;--accent:#4f7bd1;--radius:8px;font-family:"Noto Serif TC",serif;background:radial-gradient(circle at 50% 50%,transparent 18px,rgba(31,74,168,.06) 19px 20px,transparent 21px) 0 0/60px 60px,#f7f9fc}
+body[data-theme="porcelain"] #site-header{background:#fff;border-bottom:none;box-shadow:0 3px 0 #1f4aa8,0 6px 0 #fff,0 8px 0 #1f4aa8}
+body[data-theme="porcelain"] .brand{color:#1f4aa8;letter-spacing:.2em}
+body[data-theme="porcelain"] .brand::before{content:"🏺 "}
+body[data-theme="porcelain"] main{padding-top:1.2rem}
+body[data-theme="porcelain"] .card{border:2px solid #1f4aa8;box-shadow:inset 0 0 0 4px #fff,inset 0 0 0 5px #4f7bd1}
+body[data-theme="porcelain"] .grid>.card:hover{transform:translateY(-3px);box-shadow:inset 0 0 0 4px #fff,inset 0 0 0 5px #4f7bd1,0 8px 18px rgba(31,74,168,.18)}
+body[data-theme="porcelain"] .section-title{border:none;padding:0;color:#1f4aa8;text-align:center;letter-spacing:.25em}
+body[data-theme="porcelain"] .section-title::before,body[data-theme="porcelain"] .section-title::after{content:" ❀ "}
+body[data-theme="porcelain"] .hero{border-radius:50%/40%;background:radial-gradient(circle,#fff 55%,transparent 56%),repeating-conic-gradient(#1f4aa8 0 6deg,#fff 6deg 12deg);padding:4rem 1rem;border:4px solid #1f4aa8}
+body[data-theme="porcelain"] .hero h1{color:#1f4aa8}
+body[data-theme="porcelain"] .empty::before{content:"🫖";display:block;font-size:2.4rem;opacity:.6}
+
+/* ---------- 蒸汽齒輪：黃銅、深棕皮革、四角鉚釘、齒輪紋 ---------- */
+body[data-theme="steampunk"]{--bg:#2a1d14;--surface:#3a291c;--text:#f1dfc0;--muted:#b89a73;--primary:#d19a45;--primary-text:#2a1d14;--border:#6b4a2b;--accent:#7fa6a0;--radius:6px;font-family:"Noto Serif TC",serif;background:radial-gradient(circle at 90% 10%,#2a1d14 0 50px,transparent 51px),repeating-conic-gradient(from 0deg at 90% 10%,rgba(209,154,69,.12) 0 10deg,transparent 10deg 20deg),#2a1d14;background-attachment:fixed}
+body[data-theme="steampunk"] :is(h1,h2,h3,.brand){font-family:"Cinzel","Noto Serif TC",serif}
+body[data-theme="steampunk"] #site-header{background:linear-gradient(180deg,#b3803a,#7a5326);border-bottom:3px solid #3b2a16}
+body[data-theme="steampunk"] :is(.brand,#main-nav a){color:#fff3d6;text-shadow:0 1px 0 #3b2a16}
+body[data-theme="steampunk"] .brand::before{content:"⚙ "}
+body[data-theme="steampunk"] .card{border:2px solid #b3803a;background:radial-gradient(circle at 8px 8px,#d19a45 0 3px,transparent 4px),radial-gradient(circle at calc(100% - 8px) 8px,#d19a45 0 3px,transparent 4px),radial-gradient(circle at 8px calc(100% - 8px),#d19a45 0 3px,transparent 4px),radial-gradient(circle at calc(100% - 8px) calc(100% - 8px),#d19a45 0 3px,transparent 4px),#3a291c}
+body[data-theme="steampunk"] .grid>.card:hover{box-shadow:0 0 16px rgba(209,154,69,.4)}
+body[data-theme="steampunk"] .section-title{border:none;padding:0;color:#d19a45}
+body[data-theme="steampunk"] .section-title::before{content:"⚙ "}
+body[data-theme="steampunk"] button{background:linear-gradient(180deg,#5a3f25,#3a291c);border-color:#b3803a;color:#f1dfc0}
+body[data-theme="steampunk"] button.primary{background:linear-gradient(180deg,#e0b066,#a8742f);color:#2a1d14}
+body[data-theme="steampunk"] .hero{border:3px solid #b3803a;background:linear-gradient(160deg,#4a3422,#2a1d14);box-shadow:inset 0 0 30px rgba(0,0,0,.5)}
+body[data-theme="steampunk"] .hero h1{color:#d19a45}
+body[data-theme="steampunk"] .empty::before{content:"⚙";display:block;font-size:2.4rem;opacity:.6}
+
+/* ---------- 野餐格紋：紅白格子桌巾、草地綠、虛線縫邊 ---------- */
+body[data-theme="gingham"]{--bg:#fffdf8;--surface:#ffffff;--text:#3b2a24;--muted:#8f7a70;--primary:#d64545;--primary-text:#fff;--border:#efd9d0;--accent:#6aa84f;--radius:10px;font-family:"Huninn","Noto Sans TC",sans-serif;background:linear-gradient(90deg,rgba(214,69,69,.12) 50%,transparent 50%) 0 0/36px 36px,linear-gradient(rgba(214,69,69,.12) 50%,transparent 50%) 0 0/36px 36px,#fffdf8}
+body[data-theme="gingham"] #site-header{background:#fff;border-bottom:none;box-shadow:0 4px 0 #6aa84f}
+body[data-theme="gingham"] .brand{color:#d64545}
+body[data-theme="gingham"] .brand::before{content:"🧺 "}
+body[data-theme="gingham"] .card{border:2px dashed #e8b3a8;box-shadow:0 4px 10px rgba(59,42,36,.08)}
+body[data-theme="gingham"] .grid>.card:hover{transform:translateY(-4px);border-style:solid}
+body[data-theme="gingham"] .section-title{display:inline-block;border:none;background:#6aa84f;color:#fff;padding:.15em .9em;border-radius:999px}
+body[data-theme="gingham"] button{border-radius:999px}
+body[data-theme="gingham"] .hero{background:#fff;border:3px solid #d64545;border-radius:20px;box-shadow:0 0 0 8px #fff,0 0 0 10px #e8b3a8}
+body[data-theme="gingham"] .empty::before{content:"🍓";display:block;font-size:2.4rem;opacity:.7}
+
+/* ---------- 午後拿鐵：奶泡米、焦糖棕、咖啡杯印 ---------- */
+body[data-theme="latte"]{--bg:#f3eadf;--surface:#fffaf4;--text:#3e2b20;--muted:#957c69;--primary:#8b5a3c;--primary-text:#fff;--border:#e5d5c3;--accent:#c89f6e;--radius:16px;font-family:"LXGW WenKai TC","Noto Serif TC",serif;background:radial-gradient(circle at 88% 22%,transparent 46px,rgba(139,90,60,.1) 47px 52px,transparent 53px),radial-gradient(circle at 8% 78%,transparent 36px,rgba(139,90,60,.08) 37px 41px,transparent 42px),#f3eadf;background-attachment:fixed}
+body[data-theme="latte"] #site-header{background:#fffaf4;border-bottom:1px solid #e5d5c3}
+body[data-theme="latte"] .brand{color:#8b5a3c}
+body[data-theme="latte"] .brand::before{content:"☕ "}
+body[data-theme="latte"] .card{border:none;box-shadow:0 6px 18px rgba(62,43,32,.08)}
+body[data-theme="latte"] .grid>.card:hover{transform:translateY(-4px);box-shadow:0 10px 24px rgba(62,43,32,.15)}
+body[data-theme="latte"] .section-title{border:none;padding:0;color:#8b5a3c}
+body[data-theme="latte"] .section-title::after{content:"";display:block;width:3em;height:4px;border-radius:2px;margin-top:.3em;background:linear-gradient(90deg,#8b5a3c,#c89f6e)}
+body[data-theme="latte"] button{border-radius:999px}
+body[data-theme="latte"] .hero{background:radial-gradient(circle at 50% 50%,#fffaf4 0 25%,#e8d4bd 26% 30%,#c89f6e 31% 100%);border-radius:28px;padding:3.4rem 1rem}
+body[data-theme="latte"] .empty::before{content:"🥐";display:block;font-size:2.4rem;opacity:.6}
+
+/* ---------- 千禧亮片：Y2K 粉藍、鉻銀頁首、星星 ---------- */
+body[data-theme="y2k"]{--bg:#fde7ff;--surface:#ffffff;--text:#3a1d5a;--muted:#9a7cba;--primary:#ff3fb4;--primary-text:#fff;--border:#e9c9ff;--accent:#3fc6ff;--radius:20px;font-family:"Noto Sans TC",sans-serif;background:radial-gradient(circle at 20% 20%,#c6f1ff,transparent 40%),radial-gradient(circle at 80% 70%,#ffd1f2,transparent 45%),#fde7ff;background-attachment:fixed}
+body[data-theme="y2k"] :is(h1,h2,h3,.brand){font-family:"Righteous","Noto Sans TC",sans-serif}
+body[data-theme="y2k"] #site-header{background:linear-gradient(180deg,#ffffff,#d9dde6 50%,#f4f6fa);border-bottom:2px solid #b8bfcc}
+body[data-theme="y2k"] .brand{color:#ff3fb4;text-shadow:2px 2px 0 #3fc6ff}
+body[data-theme="y2k"] .brand::before{content:"💖 "}
+body[data-theme="y2k"] .card{border:2px solid #fff;box-shadow:0 0 0 2px #e9c9ff,0 10px 24px rgba(255,63,180,.15)}
+body[data-theme="y2k"] .grid>.card:hover{transform:scale(1.03) rotate(-1deg)}
+body[data-theme="y2k"] .section-title{border:none;padding:0;color:#ff3fb4}
+body[data-theme="y2k"] .section-title::before{content:"★ ";color:#3fc6ff}
+body[data-theme="y2k"] .section-title::after{content:" ★";color:#3fc6ff}
+body[data-theme="y2k"] button{border-radius:999px;background:linear-gradient(180deg,#fff,#e7e9ef);border-color:#c4c9d4}
+body[data-theme="y2k"] button.primary{background:linear-gradient(180deg,#ff8ad3,#ff3fb4);border-color:#ff3fb4}
+body[data-theme="y2k"] .hero{background:linear-gradient(135deg,#ff9ee0,#b6a6ff,#8be4ff);border-radius:40px;border:3px solid #fff;box-shadow:0 0 0 3px #e9c9ff}
+body[data-theme="y2k"] .hero :is(h1,p,.muted){color:#fff;text-shadow:0 2px 0 #ff3fb4}
+body[data-theme="y2k"] .empty::before{content:"🦋";display:block;font-size:2.4rem;opacity:.7}
+
+/* ---------- 蒸氣波：粉紫夕陽、透視網格地面、雙色殘影 ---------- */
+body[data-theme="vapor"]{--bg:#2b1452;--surface:#3b1f6b;--text:#ffe9fb;--muted:#c79fe0;--primary:#ff71ce;--primary-text:#2b1452;--border:#5b3a92;--accent:#01cdfe;--radius:4px;font-family:"Space Grotesk","Noto Sans TC",sans-serif;background:linear-gradient(180deg,#2b1452,#7a2a8c 50%,#ff71ce 62%,#2b1452 62%) fixed}
+body[data-theme="vapor"]::before{content:"";position:fixed;left:-50%;right:-50%;bottom:0;height:38vh;z-index:-1;pointer-events:none;background:linear-gradient(#01cdfe 1px,transparent 1px) 0 0/100% 30px,linear-gradient(90deg,#01cdfe 1px,transparent 1px) 0 0/60px 100%;opacity:.35;transform:perspective(300px) rotateX(55deg);transform-origin:bottom}
+body[data-theme="vapor"] #site-header{background:rgba(43,20,82,.85);border-bottom:2px solid #ff71ce}
+body[data-theme="vapor"] .brand{color:#01cdfe;font-style:italic;letter-spacing:.2em;text-shadow:2px 2px 0 #ff71ce}
+body[data-theme="vapor"] .card{border:1px solid #5b3a92;background:rgba(59,31,107,.9)}
+body[data-theme="vapor"] .grid>.card:hover{box-shadow:4px 4px 0 #01cdfe,-4px -4px 0 #ff71ce}
+body[data-theme="vapor"] .section-title{border:none;padding:0;color:#01cdfe;letter-spacing:.3em;font-style:italic}
+body[data-theme="vapor"] button.primary{background:#ff71ce;border-color:#ff71ce}
+body[data-theme="vapor"] .hero{background:radial-gradient(circle at 50% 100%,#ffb86b 0 22%,#ff71ce 23% 30%,transparent 31%),linear-gradient(180deg,#3b1f6b,#7a2a8c);border:1px solid #ff71ce}
+body[data-theme="vapor"] .hero h1{color:#fff;letter-spacing:.25em;text-shadow:3px 3px 0 #01cdfe}
+body[data-theme="vapor"] .empty::before{content:"🌴";display:block;font-size:2.4rem;opacity:.7}
+
+/* ---------- 摺紙：多彩紙片、摺角卡片、斜切橫幅 ---------- */
+body[data-theme="origami"]{--bg:#f2efe9;--surface:#ffffff;--text:#2d2a26;--muted:#857e74;--primary:#e2574c;--primary-text:#fff;--border:#e2ddd3;--accent:#3a8fb7;--radius:0;font-family:"Noto Sans TC",sans-serif;background:linear-gradient(135deg,rgba(226,87,76,.08) 25%,transparent 25%) 0 0/80px 80px,linear-gradient(225deg,rgba(58,143,183,.07) 25%,transparent 25%) 0 0/80px 80px,#f2efe9}
+body[data-theme="origami"] #site-header{background:#fff;border-bottom:none;box-shadow:0 4px 0 #e2574c,0 8px 0 #f2b33d,0 12px 0 #3a8fb7}
+body[data-theme="origami"] main{padding-top:1.4rem}
+body[data-theme="origami"] .brand::before{content:"🦢 "}
+body[data-theme="origami"] .grid>.card{border:none;position:relative;background:linear-gradient(225deg,transparent 18px,#fff 18px);box-shadow:0 4px 10px rgba(0,0,0,.08)}
+body[data-theme="origami"] .grid>.card::after{content:"";position:absolute;top:0;right:0;width:18px;height:18px;background:linear-gradient(225deg,transparent 50%,#d9d2c5 50%);pointer-events:none}
+body[data-theme="origami"] .grid>.card:hover{transform:translateY(-4px) rotate(.5deg)}
+body[data-theme="origami"] .grid>.card:nth-child(3n+1){border-bottom:5px solid #e2574c}
+body[data-theme="origami"] .grid>.card:nth-child(3n+2){border-bottom:5px solid #f2b33d}
+body[data-theme="origami"] .grid>.card:nth-child(3n){border-bottom:5px solid #3a8fb7}
+body[data-theme="origami"] .section-title{border:none;padding:0}
+body[data-theme="origami"] .section-title::before{content:"◤ ";color:#e2574c}
+body[data-theme="origami"] .hero{background:linear-gradient(135deg,#e2574c 0 33%,#f2b33d 33% 66%,#3a8fb7 66%);clip-path:polygon(0 0,100% 0,100% 85%,92% 100%,0 100%)}
+body[data-theme="origami"] .hero :is(h1,p,.muted){color:#fff;text-shadow:0 2px 4px rgba(0,0,0,.25)}
+body[data-theme="origami"] .empty::before{content:"🗒";display:block;font-size:2.4rem;opacity:.6}
+
+/* ---------- 彩繪玻璃：黑色鉛條、寶石色塊、拱窗橫幅 ---------- */
+body[data-theme="stained"]{--bg:#1a1a22;--surface:#24242e;--text:#f4efe6;--muted:#a9a196;--primary:#e0b443;--primary-text:#1a1a22;--border:#3a3a44;--accent:#3d8bd4;--radius:6px;font-family:"Noto Serif TC",serif;background:conic-gradient(from 45deg,rgba(196,48,64,.18) 0 25%,rgba(61,139,212,.18) 0 50%,rgba(224,180,67,.16) 0 75%,rgba(64,160,96,.18) 0) 0 0/120px 120px,#1a1a22}
+body[data-theme="stained"] :is(h1,h2,h3,.brand){font-family:"Cinzel","Noto Serif TC",serif}
+body[data-theme="stained"] #site-header{background:#0f0f14;border-bottom:4px solid #000;box-shadow:0 2px 0 #e0b443}
+body[data-theme="stained"] .brand{color:#e0b443}
+body[data-theme="stained"] .brand::before{content:"⛪ "}
+body[data-theme="stained"] .card{border:4px solid #000;box-shadow:0 0 0 1px #3a3a44}
+body[data-theme="stained"] .grid>.card:nth-child(4n+1){background:linear-gradient(rgba(196,48,64,.22),rgba(196,48,64,.22)),#24242e}
+body[data-theme="stained"] .grid>.card:nth-child(4n+2){background:linear-gradient(rgba(61,139,212,.22),rgba(61,139,212,.22)),#24242e}
+body[data-theme="stained"] .grid>.card:nth-child(4n+3){background:linear-gradient(rgba(224,180,67,.2),rgba(224,180,67,.2)),#24242e}
+body[data-theme="stained"] .grid>.card:nth-child(4n){background:linear-gradient(rgba(64,160,96,.22),rgba(64,160,96,.22)),#24242e}
+body[data-theme="stained"] .grid>.card:hover{box-shadow:0 0 20px rgba(224,180,67,.4)}
+body[data-theme="stained"] .section-title{border:none;padding:0;color:#e0b443;text-align:center}
+body[data-theme="stained"] .section-title::before,body[data-theme="stained"] .section-title::after{content:" ✠ "}
+body[data-theme="stained"] .hero{border:6px solid #000;border-radius:50% 50% 6px 6px/120px 120px 6px 6px;padding-top:4rem;background:conic-gradient(from -90deg at 50% 100%,#c43040 0 30deg,#3d8bd4 30deg 60deg,#e0b443 60deg 90deg,#40a060 90deg 120deg,#7a4fb8 120deg 150deg,#c43040 150deg 180deg,#24242e 180deg)}
+body[data-theme="stained"] .hero :is(h1,p,.muted){color:#fff;text-shadow:0 2px 6px #000}
+body[data-theme="stained"] .empty::before{content:"🕯";display:block;font-size:2.4rem;opacity:.7}
+
+/* ---------- 鉛筆素描：素描紙、手繪歪斜框線、螢光筆標題 ---------- */
+body[data-theme="sketch"]{--bg:#fafaf7;--surface:#ffffff;--text:#2b2b2b;--muted:#7d7d78;--primary:#2b2b2b;--primary-text:#fff;--border:#2b2b2b;--accent:#f5d76e;--radius:0;font-family:"LXGW WenKai TC","Noto Sans TC",sans-serif;background:repeating-linear-gradient(135deg,rgba(0,0,0,.015) 0 2px,transparent 2px 6px),#fafaf7}
+body[data-theme="sketch"] #site-header{background:#fafaf7;border-bottom:2px solid #2b2b2b}
+body[data-theme="sketch"] .brand::before{content:"✎ "}
+body[data-theme="sketch"] .card{border:2px solid #2b2b2b;border-radius:255px 15px 225px 15px/15px 225px 15px 255px;box-shadow:3px 4px 0 rgba(0,0,0,.15)}
+body[data-theme="sketch"] .grid>.card:hover{transform:rotate(-.8deg);box-shadow:5px 6px 0 rgba(0,0,0,.2)}
+body[data-theme="sketch"] :is(button,input,select,textarea,.tag,.album-chip){border:2px solid #2b2b2b;border-radius:255px 15px 225px 15px/15px 225px 15px 255px}
+body[data-theme="sketch"] .section-title{border:none;padding:0;display:inline-block;background:linear-gradient(100deg,transparent 2%,rgba(245,215,110,.8) 3% 97%,transparent 98%) 0 70%/100% 45% no-repeat}
+body[data-theme="sketch"] .hero{border:2px solid #2b2b2b;border-radius:15px 255px 15px 225px/225px 15px 255px 15px;background:#fff}
+body[data-theme="sketch"] .empty::before{content:"✎";display:block;font-size:2.4rem;opacity:.6}
+
+/* 頁首是深色/彩色的範本：手機版下拉選單是淺色底，連結要改回內文色 */
+@media(max-width:720px){
+  body:is([data-theme="xmas"],[data-theme="autumn"],[data-theme="tropical"],[data-theme="redwall"],[data-theme="steampunk"]) #main-nav a{color:var(--text);text-shadow:none}
+}
+
+/* ===== 效能：捲動不卡 =====
+   毛玻璃（backdrop-filter）和固定背景（background-attachment:fixed）會讓瀏覽器在捲動的每一格重畫整個畫面，
+   圖片多、螢幕大時特別卡。全部關掉：原本半透明靠模糊遮住底下內容的頁首改成不透明，背景改成跟著頁面捲動 */
+body[data-theme] :is(#site-header,.header-inner,.card,.hero,.bk-tag){-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+body[data-theme]{background-attachment:scroll!important}
+body:is([data-theme="night"],[data-theme="cyber"],[data-theme="aurora"],[data-theme="space"],[data-theme="deepsea"],[data-theme="holo"],[data-theme="winter"]) #site-header{background:var(--surface)!important}
+body[data-theme="lavender"] .header-inner{background:var(--surface)!important}
+
+/* 閱讀器深色／護眼：蓋過各範本自己的背景圖、點點、裝飾（範本規則載入較晚，要提高權重） */
+body.reader-dark[data-theme]{--bg:#151515;--surface:#1e1e1e;--text:#d8d4c8;--border:#333;--muted:#888;--primary:#c8a15a;--primary-text:#151515}
+body.reader-green[data-theme]{--bg:#e8f0e4;--surface:#f4f9f0;--text:#33402f;--border:#cfe0c8;--muted:#7d9070}
+body:is(.reader-dark,.reader-green)[data-theme]{background:var(--bg)!important;color:var(--text)!important}
+body:is(.reader-dark,.reader-green)[data-theme]::before,body:is(.reader-dark,.reader-green)[data-theme]::after{display:none!important}
+body:is(.reader-dark,.reader-green)[data-theme] .reader-wrap,body:is(.reader-dark,.reader-green)[data-theme] .reader-wrap :is(h1,p){color:var(--text)!important;background-color:transparent}
+body:is(.reader-dark,.reader-green)[data-theme] .reader-wrap p.bm-para{background:color-mix(in srgb,var(--primary) 12%,transparent)}
+body:is(.reader-dark,.reader-green)[data-theme] .reader-bar{background:var(--surface)!important;color:var(--text)!important;border-color:var(--border)!important}
+body:is(.reader-dark,.reader-green)[data-theme] .reader-bar :is(button,select,a){color:var(--text)!important;background:var(--bg)!important;border-color:var(--border)!important}

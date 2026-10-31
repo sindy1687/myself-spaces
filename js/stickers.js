@@ -1,5 +1,5 @@
 // 可愛圖示／貼紙：內建 SVG（無外部圖片）＋自訂上傳＋選擇面板
-import { esc, uid, modal, toast } from './util.js';
+import { esc, uid, modal, toast, fileObjectURL } from './util.js';
 import { db } from './db.js';
 import { getSettings, saveSettings } from './store.js';
 
@@ -75,8 +75,8 @@ export async function hydrateStickers(root) {
     if (it) { el.innerHTML = it.svg; el.title = el.title || it.name; el.setAttribute('role', 'img'); el.setAttribute('aria-label', el.title || it.name); continue; }
     const c = custom.find(x => x.id === id);
     if (c && !el.querySelector('img')) {
-      const f = await db.get('files', c.fileId);
-      if (f) el.innerHTML = `<img src="${URL.createObjectURL(f.blob)}" alt="${esc(c.name)}" loading="lazy">`;
+      const url = await fileObjectURL(c.fileId);
+      if (url) el.innerHTML = `<img src="${url}" alt="${esc(c.name)}" loading="lazy">`;
       else el.textContent = '⚠ 貼紙檔案未同步';
     }
   }
