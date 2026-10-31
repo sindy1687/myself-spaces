@@ -73,7 +73,24 @@
 .tp-card small{color:var(--muted)}
 .tp-opts{margin-top:.8rem;border-top:1px solid var(--border);padding-top:.6rem}
 .tp-opts .row label{font-weight:400;margin:0}
-@media(max-width:640px){.tp-picker{grid-template-columns:1fr}.tp-cats{flex-direction:row;flex-wrap:wrap}.tp-grid{grid-template-columns:repeat(2,1fr);max-height:40vh}.tp-thumb{height:150px}.tp-thumb-inner{transform:scale(.24)}}
+/* 縮圖內頁是 620px 寬再縮小，要讓卡片可以比內容窄，否則手機上卡片會撐出視窗被切掉 */
+.tp-picker>*,.tp-grid .tp-card{min-width:0}
+@media(max-width:640px){
+  .tp-picker{grid-template-columns:1fr;gap:.6rem}
+  /* 分類排成一行，往左滑看其他分類，不佔兩三排高度 */
+  .tp-cats{flex-direction:row;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:.1rem}
+  .tp-cats::-webkit-scrollbar{display:none}
+  .tp-cats button{flex:none;padding:.3em .8em;font-size:.88rem}
+  .tp-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem;max-height:42vh}
+  .tp-grid .tp-card{padding:.3rem}
+  .tp-thumb{height:140px}
+  .tp-thumb-inner{transform:scale(.235)}
+  .tp-card b{font-size:.9rem;margin-top:.3rem}
+  .tp-card small{display:block;font-size:.75rem;line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .tp-opts{margin-top:.5rem;font-size:.9rem}
+  .tp-opts .row{gap:.2rem .7rem}
+  .modal:has(.tp-picker)>.row:last-child button{flex:1}
+}
 
 /* ===== 遠方來信（旅遊）：米白紙、霧藍、鼠尾草綠、淡咖啡 ===== */
 .dt-travel-letter{

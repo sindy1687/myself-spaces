@@ -299,6 +299,9 @@ export function richToolbar(bar, ce, opts = {}) {
   });
   bar.querySelectorAll('input[type=color]').forEach(i => i.onchange = () => exec(i.dataset.cmd, i.value));
   const insertNode = html => { ce.focus(); document.execCommand('insertHTML', false, html); };
+  // 選檔案、開對話框時編輯區會失焦（手機上尤其明顯），先記住游標，插入前放回去
+  const saveRange = () => { const sel = getSelection(); return sel.rangeCount && ce.contains(sel.getRangeAt(0).commonAncestorContainer) ? sel.getRangeAt(0).cloneRange() : null; };
+  const restoreRange = r => { ce.focus(); if (r) { const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); } };
   bar.querySelector('#tb-link').onclick = () => { const u = prompt('連結網址', 'https://'); if (u) exec('createLink', u); };
   bar.querySelector('#tb-table').onclick = () => {
     const r = +prompt('列數', '3'), c = +prompt('欄數', '3');
@@ -312,20 +315,29 @@ export function richToolbar(bar, ce, opts = {}) {
     inp.click();
   });
   bar.querySelector('#tb-img').onclick = async () => {
+    const range = saveRange();
     const f = await pickMedia('image/*', 15);
     if (!f) return;
     if (f.size > 15 * 1024 * 1024) return toast('圖片超過 15MB', 'error');
     const chosen = await imageUploadDialog([f]);
     if (!chosen) return;
     const { db } = await import('./db.js');
+    restoreRange(range);
+    // 放進照片區：點圖片就能拖四角拉大拉小、移動、旋轉、靠左右
+    const { photoZone, photoItem } = await import('./doc-templates/parts.js');
+    const items = [];
     for (const it of chosen) {
       const fid = uid();
       await db.put('files', { id: fid, blob: it.file });
-      insertNode(`<img data-fid="${fid}" alt="" style="max-width:100%" data-name="${esc(it.name)}">`);
-      toast(`已插入 ${it.name}（${(it.file.size / 1024).toFixed(0)}KB）`, 'success');
+      items.push(photoItem(fid, { width: chosen.length > 1 ? 49 : 100, alt: '' }));
     }
+    insertNode(photoZone().replace('></div>', '>' + items.join('') + '</div>') + '<p><br></p>');
+    toast(chosen.length > 1 ? `已插入 ${chosen.length} 張圖片` : `已插入 ${chosen[0].name}：點圖片可拖四角調整大小`, 'success');
+    // 插入的 <img> 只有 data-fid，要讀出圖片檔才看得到
+    hydrateMedia(ce);
   };
   bar.querySelector('#tb-video').onclick = async () => {
+    const range = saveRange();
     const f = await pickMedia('video/mp4,video/webm,video/*');
     if (!f) return;
     if (!f.type.startsWith('video/')) return toast('不支援的影片格式（建議 MP4/WebM）', 'error');
@@ -333,8 +345,10 @@ export function richToolbar(bar, ce, opts = {}) {
     const { db } = await import('./db.js');
     const fid = uid();
     await db.put('files', { id: fid, blob: f });
+    restoreRange(range);
     insertNode(`<figure><video data-fid="${fid}" controls preload="metadata" style="max-width:100%"></video><figcaption class="muted">${esc(f.name)}</figcaption></figure><p><br></p>`);
     toast(`已插入影片 ${f.name}（${(f.size / 1048576).toFixed(1)}MB）`, 'success');
+    hydrateMedia(ce);
   };
   bar.querySelector('#tb-stk').onclick = async () => {
     // 記住游標位置再開面板
@@ -655,4 +669,14 @@ export function imageUploadDialog(files) {
         }
       });
   });
+}
+
+// 標題欄沒填時，從內文找標題：先找第一個大標題（h1～h3），沒有就用第一行文字；模板的「＿＿＿＿」填空不算
+export function titleFromContent(ce, typed) {
+  const t = (typed || '').trim();
+  if (t && t !== '無標題') return t;
+  const clean = s => (s || '').replace(/[＿_]+/g, ' ').replace(/s+/g, ' ').trim();
+  for (const h of ce.querySelectorAll('h1,h2,h3')) { const s = clean(h.textContent); if (s.length > 1) return s.slice(0, 60); }
+  for (const p of ce.querySelectorAll('p,div,li')) { if (p.querySelector('p,div,li')) continue; const s = clean(p.textContent); if (s.length > 1) return s.slice(0, 40); }
+  return '無標題';
 }

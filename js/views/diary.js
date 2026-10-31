@@ -1,7 +1,7 @@
 // 日記：清單/月曆、編輯器（標題/段落/清單/引用/連結/插入圖片）、草稿
 import { list, get, save, trash, listCategories, canView, isLocked } from '../store.js';
 import { db } from '../db.js';
-import { esc, uid, modal, toast, confirmDialog, sanitizeHTML, attachUploadBtn, richToolbar, hydrateMedia, isFid, privateNotice, lockNotice, lockBadge } from '../util.js';
+import { esc, uid, modal, toast, confirmDialog, sanitizeHTML, attachUploadBtn, richToolbar, hydrateMedia, isFid, privateNotice, lockNotice, lockBadge, titleFromContent } from '../util.js';
 import { shareDialog, countView, catChips, bindCatChips } from './novel.js';
 import { setNav } from './home.js';
 import { isAuthed } from '../auth.js';
@@ -29,11 +29,11 @@ export async function renderDiary() {
     (!tag || (d.tags || []).includes(tag)));
 
   app.innerHTML = `
-    <div class="row"><h1 style="margin-right:auto">日記</h1>
+    <div class="row list-head"><h1 style="margin-right:auto">日記</h1>
       <a href="#/diary?view=list"><button class="${view === 'list' ? 'primary' : ''}">清單</button></a>
       <a href="#/diary?view=calendar"><button class="${view === 'calendar' ? 'primary' : ''}">月曆</button></a>
-      ${isAuthed() ? `<button id="sel-btn" ${view === 'calendar' ? 'class="hidden"' : ''}>☑ 選取</button><button id="new-d" class="primary">＋ 寫日記</button>` : ''}</div>
-    <form id="df" class="row" style="margin:.8rem 0">
+      ${isAuthed() ? `<button id="sel-btn" ${view === 'calendar' ? 'class="hidden"' : ''}>☑ 選取</button><button id="new-d" class="primary lh-main">＋ 寫日記</button>` : ''}</div>
+    <form id="df" class="row filter-bar" style="margin:.8rem 0">
       <input name="q" placeholder="關鍵字" value="${esc(kw)}" style="max-width:200px">
       <select name="cat" style="max-width:150px"><option value="">全部分類</option>${cats.map(c => `<option value="${c.id}" ${c.id === cat ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
       <input name="tag" placeholder="標籤" value="${esc(tag)}" style="max-width:130px">
@@ -116,7 +116,7 @@ async function editor(d) {
   const imgs = await list('image');
   modal(`
     <h3>${d ? '編輯' : '新增'}日記</h3>
-    <label>標題</label><input id="e-title" value="${esc(d?.title || '')}">
+    <label>標題</label><input id="e-title" value="${esc(d?.title === '無標題' ? '' : d?.title || '')}" placeholder="沒填的話，會自動用內文的大標題">
     <div class="row">
       <div style="flex:1"><label>日期</label><input type="date" id="e-date" value="${esc(d?.date || new Date().toISOString().slice(0, 10))}"></div>
       <div style="flex:1"><label>心情</label><select id="e-mood">${MOODS.map(m => `<option ${d?.mood === m ? 'selected' : ''}>${m}</option>`).join('')}</select></div>
@@ -161,7 +161,7 @@ async function editor(d) {
         ce.addEventListener('input', () => { dirty.val = true; bg.querySelector('#e-lastsave').textContent = '有未儲存的變更'; });
         bg.addEventListener('click', e => { if (e.target.closest('[data-close]') && dirty.val && !confirm('尚未儲存，確定離開？')) e.stopImmediatePropagation(); }, true);
         const collect = status => ({
-          ...(d || {}), title: bg.querySelector('#e-title').value.trim() || '無標題',
+          ...(d || {}), title: titleFromContent(ce, bg.querySelector('#e-title').value),
           date: bg.querySelector('#e-date').value, mood: bg.querySelector('#e-mood').value, weather: bg.querySelector('#e-wea').value,
           cover: bg.querySelector('#e-cover').value, content: sanitizeHTML(ce.innerHTML), status,
           categoryIds: [...bg.querySelector('#e-cat').selectedOptions].map(o => o.value),

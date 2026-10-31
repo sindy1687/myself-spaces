@@ -87,6 +87,7 @@ export function attachDocEditor(ce, hist) {
         <button data-a="free" class="${free ? 'on' : ''}" title="照片可在區內自由擺放">自由拼貼</button>
         ${free ? `<label>比例<select data-in="ratio">${[['1/1', '1:1 方形'], ['4/3', '4:3'], ['3/2', '3:2'], ['16/9', '16:9 寬'], ['3/4', '3:4 直'], ['2/3', '2:3 直']].map(([v, l]) => `<option value="${v}" ${v === ratio ? 'selected' : ''}>${l}</option>`).join('')}</select></label>`
                : n > 1 ? `<span class="de-tag">欄數</span>${[1, 2, 3].map(c => `<button data-a="cols" data-v="${c}">${c}</button>`).join('')}` : ''}
+        ${free ? '' : (() => { const al = zone.style.justifyContent || 'center'; return [['flex-start', '⇤ 靠左'], ['center', '⇹ 置中'], ['flex-end', '靠右 ⇥']].map(([v, l]) => `<button data-a="align" data-v="${v}" class="${al === v ? 'on' : ''}">${l}</button>`).join(''); })()}
       </div>`;
     tools.hidden = false;
     place();
@@ -110,6 +111,7 @@ export function attachDocEditor(ce, hist) {
       if (a === 'lock') { if (isLocked(item)) item.removeAttribute('data-lock'); else item.dataset.lock = '1'; }
       if (a === 'del') { const z = zone; item.remove(); item = null; zone = z; }
       if (a === 'flow' || a === 'free') setLayout(zone, a);
+      if (a === 'align') { if (b.dataset.v === 'center') zone.style.removeProperty('justify-content'); else zone.style.justifyContent = b.dataset.v; if (!zone.getAttribute('style')) zone.removeAttribute('style'); }
       if (a === 'cols') { const w = autoW(+b.dataset.v); itemsOf(zone).forEach(i => { i.style.width = w + '%'; }); }
     });
     renderTools();
@@ -293,6 +295,25 @@ export function attachDocEditor(ce, hist) {
     });
   }
 
+  function wrapBareImg(img) {
+    const W = ce.clientWidth || 1, w = clamp(img.getBoundingClientRect().width / W * 100, 5, 100);
+    let fig;
+    hist.change(() => {
+      const z = document.createElement('div');
+      z.className = 'pz'; z.dataset.layout = 'flow'; z.contentEditable = 'false'; z.title = '照片';
+      fig = document.createElement('figure');
+      fig.className = 'pz-item'; fig.contentEditable = 'false'; fig.style.width = pct(w) + '%';
+      // 圖片若是段落裡唯一的東西，整段換成照片區；否則插在該段落後面
+      let host = img; while (host.parentNode && host.parentNode !== ce) host = host.parentNode;
+      const alone = host !== img && !host.textContent.trim() && host.querySelectorAll('img').length === 1;
+      img.removeAttribute('style');
+      fig.appendChild(img); z.appendChild(fig);
+      if (host === img || !host.parentNode) ce.appendChild(z);
+      else if (alone) host.replaceWith(z); else host.after(z);
+    });
+    return fig;
+  }
+
   // ---------- 拖曳：移動／縮放／旋轉 ----------
   function drag(e, onMove, onEnd) {
     const sx = e.clientX, sy = e.clientY;
@@ -372,6 +393,9 @@ export function attachDocEditor(ce, hist) {
 
   // 文章內點擊：選照片／照片區
   ce.addEventListener('pointerdown', e => {
+    // 一般插入的圖片（不在照片區裡）：點一下就包成照片區，可以拉大拉小、移動、旋轉
+    const bare = e.target.tagName === 'IMG' && !e.target.closest('.pz,.stk,a') && ce.contains(e.target) ? e.target : null;
+    if (bare) { e.preventDefault(); select(wrapBareImg(bare)); return; }
     const it = e.target.closest('.pz-item'), z = e.target.closest('.pz');
     if (it && ce.contains(it)) {
       e.preventDefault();

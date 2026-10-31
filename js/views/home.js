@@ -254,7 +254,7 @@ export async function renderSearch() {
   const app = document.getElementById('app');
   app.innerHTML = `
     <h1>搜尋</h1>
-    <form id="sf" class="row">
+    <form id="sf" class="row filter-bar fb-3">
       <input name="q" placeholder="關鍵字" value="${esc(kw)}" style="max-width:240px">
       <select name="type" style="max-width:140px"><option value="all">全部作品</option><option value="novel">小說</option><option value="image">圖片</option><option value="diary">日記</option><option value="craft">手作手札</option><option value="book">繪本</option></select>
       <select name="cat" style="max-width:160px"><option value="">全部分類</option>${cats.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select>

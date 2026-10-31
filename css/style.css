@@ -579,3 +579,17 @@ body[data-theme] .feat-slide.on .feat-cover:not(.wide):hover img{transform:none}
   .ce-acts button,.ce-bulk-btns button{padding:.25em .6em;font-size:.82em}
   .ce-bulk-btns{flex:1 1 100%}
 }
+
+/* 列表頁頂端（日記等）：手機上標題＋主要按鈕一行，其他按鈕下一行；篩選欄排成整齊的兩行 */
+@media (max-width:720px){
+  .list-head{gap:.4rem;row-gap:.5rem}
+  .list-head>h1{flex:1 1 calc(100% - 9rem);margin:0!important;font-size:1.6rem}
+  .list-head>.lh-main{order:1;white-space:nowrap}
+  .list-head>:not(h1):not(.lh-main){order:2}
+  .list-head>:not(h1):not(.lh-main) button,.list-head>button:not(.lh-main){padding:.3em .8em;font-size:.88rem}
+  .filter-bar{display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr));gap:.5rem}
+  .filter-bar>*{max-width:none!important;width:100%;margin:0!important;grid-column:span 3}
+  .filter-bar>:first-child{grid-column:1/5}
+  .filter-bar>button[type=submit]{grid-column:5/7;grid-row:1;white-space:nowrap}
+  .filter-bar.fb-3>:not(:first-child):not(button){grid-column:span 2}
+}

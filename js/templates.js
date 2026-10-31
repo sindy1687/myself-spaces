@@ -1,5 +1,6 @@
-// 文章風格模板：18 種風格 × 4 區塊，風格與排版分開選
+// 文章風格模板：18＋48 種風格 × 4 區塊，風格與排版分開選
 import { esc, uid } from './util.js';
+import { MORE_STYLES } from './templates-more.js';
 
 const PH = n => `<figure class="ph" data-ph="${esc(n)}" contenteditable="false" style="border:2px dashed var(--border);border-radius:10px;padding:1.6em;text-align:center;color:var(--muted);cursor:pointer;margin:.8em 0">［${esc(n)}］<br><small>點我放圖片</small></figure>`;
 
@@ -169,6 +170,7 @@ export const TPL_STYLES = [
     end: `<p style="text-align:right"><small>${U}</small></p>`,
     photos: { cover: '作品照片', album: ['作品一', '作品二'] },
   },
+  ...MORE_STYLES,
 ];
 
 // 依風格＋勾選區塊產生 HTML；mode: fixed（佔位圖整齊排列）/ free（自由拼貼層）

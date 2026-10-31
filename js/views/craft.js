@@ -1,7 +1,7 @@
 // 手作手札：清單、詳情、富文字編輯器（材料/工具/步驟/心得）
 import { list, get, save, trash, listCategories, canView, isLocked } from '../store.js';
 import { db } from '../db.js';
-import { esc, uid, modal, toast, confirmDialog, fmtDate, sanitizeHTML, attachUploadBtn, richToolbar, hydrateMedia, isFid, initialOf, privateNotice, lockNotice, lockBadge } from '../util.js';
+import { esc, uid, modal, toast, confirmDialog, fmtDate, sanitizeHTML, attachUploadBtn, richToolbar, hydrateMedia, isFid, initialOf, privateNotice, lockNotice, lockBadge, titleFromContent } from '../util.js';
 import { shareDialog, countView, catChips, bindCatChips } from './novel.js';
 import { isAuthed } from '../auth.js';
 import { selectMode } from '../select-mode.js';
@@ -87,7 +87,7 @@ async function editor(d) {
   const cats = await listCategories('craft');
   modal(`
     <h3>${d ? '編輯' : '新增'}手札</h3>
-    <label>標題</label><input id="c-t" value="${esc(d?.title || '')}">
+    <label>標題</label><input id="c-t" value="${esc(d?.title === '無標題' ? '' : d?.title || '')}" placeholder="沒填的話，會自動用內文的大標題">
     <label>簡介</label><input id="c-d" value="${esc(d?.desc || '')}">
     <div class="row">
       <div style="flex:1"><label>製作日期</label><input type="date" id="c-date" value="${esc(d?.date || new Date().toISOString().slice(0, 10))}"></div>
@@ -133,7 +133,7 @@ async function editor(d) {
           });
         });
         const collect = status => ({
-          ...(d || {}), title: bg.querySelector('#c-t').value.trim() || '無標題',
+          ...(d || {}), title: titleFromContent(ce, bg.querySelector('#c-t').value),
           desc: bg.querySelector('#c-d').value, date: bg.querySelector('#c-date').value,
           status, cover: bg.querySelector('#c-cover').value,
           materials: bg.querySelector('#c-mat').value, tools: bg.querySelector('#c-tool').value,
